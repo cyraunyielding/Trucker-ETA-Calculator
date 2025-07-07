@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trucker ETA Calculator</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better aesthetics and responsiveness */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Softer shadow */
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid #e2e8f0; /* Subtle border */
+        }
+        .title {
+            color: #2c3e50; /* Darker title color */
+            font-size: 2.25rem; /* Larger title */
+            font-weight: 700;
+            margin-bottom: 1.75rem;
+            letter-spacing: -0.025em; /* Slightly tighter letter spacing */
+        }
+        .input-group {
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #4a5568; /* Medium gray for labels */
+            font-size: 1rem;
+        }
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #cbd5e0; /* Slightly thicker border */
+            border-radius: 0.75rem; /* Rounded input fields */
+            font-size: 1rem;
+            color: #2d3748;
+            outline: none;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .input-group input:focus,
+        .input-group select:focus {
+            border-color: #4299e1; /* Blue focus border */
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5); /* Blue glow on focus */
+        }
+        #calculateBtn, #toggleAdvancedBtn {
+            background-image: linear-gradient(to right, #4299e1, #3182ce); /* Gradient button */
+            color: white;
+            padding: 0.85rem 1.75rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 10px rgba(66, 153, 225, 0.3);
+            width: 100%; /* Full width button */
+            margin-top: 1rem; /* Space between buttons */
+        }
+        #calculateBtn:hover, #toggleAdvancedBtn:hover {
+            background-image: linear-gradient(to right, #3182ce, #2b6cb0);
+            box-shadow: 0 6px 15px rgba(66, 153, 225, 0.4);
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+        #calculateBtn:active, #toggleAdvancedBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(66, 153, 225, 0.2);
+        }
+        .result-area {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #e0f2f7; /* Light blue background for result */
+            border-radius: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2c5282; /* Dark blue text */
+            min-height: 50px; /* Ensure it has some height even when empty */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word; /* Prevent long text from overflowing */
+            text-align: center; /* Center the text */
+        }
+        .error-message {
+            color: #e53e3e; /* Red for error messages */
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        .tip { /* Renamed from timezone-tip for general use */
+            font-size: 0.85rem;
+            color: #718096; /* Gray text for tips */
+            margin-top: 0.5rem;
+            text-align: left;
+        }
+
+        /* Advanced Options Styling */
+        #advancedOptions {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            text-align: left;
+        }
+        #advancedOptions h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap; /* Allow content to wrap on smaller screens */
+            align-items: flex-start; /* Align items to the top for multi-line labels/tips */
+            margin-bottom: 0.75rem;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto; /* Override full width */
+            margin-right: 0.75rem;
+            transform: scale(1.2); /* Slightly larger checkbox */
+            cursor: pointer;
+            flex-shrink: 0; /* Prevent checkbox from shrinking */
+            margin-top: 0.25rem; /* Align with text baseline */
+        }
+        .checkbox-group label {
+            margin-bottom: 0; /* Override default label margin */
+            cursor: pointer;
+            font-weight: 500;
+            color: #4a5568;
+            flex-grow: 1; /* Allow label to take available space */
+        }
+        .checkbox-group .tip { /* Specific styling for tips inside checkbox-group */
+            width: 100%; /* Take full width below checkbox and label */
+            margin-top: 0.25rem;
+            margin-left: calc(1.2em + 0.75rem); /* Indent to align with label text, based on checkbox size + margin */
+            font-size: 0.8rem; /* Slightly smaller for tips */
+            color: #718096;
+        }
+        .advanced-input-group { /* For buffer percentage and 70-hour input */
+            margin-top: 1rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .advanced-input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 1rem;
+        }
+        .advanced-input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #cbd5e0;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            color: #2d3748;
+            outline: none;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .advanced-input-group input:focus {
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+        }
+
+        #advancedResult {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #e0f7fa; /* Lighter blue for advanced result */
+            border-radius: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #00796b; /* Teal text */
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+            text-align: center;
+        }
+
+        /* Responsive adjustments for advanced section */
+        @media (max-width: 640px) {
+            #advancedOptions h2 {
+                font-size: 1.25rem;
+            }
+            .checkbox-group {
+                flex-direction: row; /* Keep checkboxes side-by-side */
+                align-items: flex-start;
+            }
+            .checkbox-group label {
+                font-size: 0.9rem;
+            }
+            .checkbox-group .tip {
+                font-size: 0.7rem; /* Even smaller on mobile */
+                margin-left: calc(1.2em + 0.75rem); /* Maintain indent */
+            }
+            .advanced-input-group label {
+                font-size: 0.9rem;
+            }
+            .advanced-input-group input {
+                padding: 0.6rem 0.8rem;
+                font-size: 0.9rem;
+            }
+            #advancedResult {
+                font-size: 1rem;
+                padding: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Trucker ETA Calculator</h1>
+
+        <div class="input-group">
+            <label for="miles">Total Miles:</label>
+            <input type="number" id="miles" placeholder="e.g., 1500" class="rounded-xl">
+        </div>
+
+        <div class="input-group">
+            <label for="speed">Average Speed (MPH):</label>
+            <input type="number" id="speed" placeholder="e.g., 60" class="rounded-xl">
+        </div>
+
+        <div class="input-group">
+            <label for="dailyDrivingLimit">Estimated Daily Driving Limit (Hours):</label>
+            <select id="dailyDrivingLimit" class="rounded-xl">
+                <option value="8">8 Hours</option>
+                <option value="9">9 Hours</option>
+                <option value="10">10 Hours</option>
+                <option value="11" selected>11 Hours (Standard HOS Max)</option>
+            </select>
+            <p class="tip">This is your estimated maximum driving time per day. The calculator includes a 1-hour daily break (covering pre-trip, post-trip, and 30-min driving break).</p>
+        </div>
+
+        <div class="input-group">
+            <label for="currentTZ">Current Time Zone:</label>
+            <select id="currentTZ" class="rounded-xl">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <p class="tip">Your device's time zone is pre-selected if possible.</p>
+        </div>
+
+        <div class="input-group">
+            <label for="destinationTZ">Destination Time Zone:</label>
+            <select id="destinationTZ" class="rounded-xl">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <p class="tip">If unsure, search online for the time zone of your destination city/state.</p>
+        </div>
+
+        <button id="calculateBtn" class="rounded-xl">Calculate ETA</button>
+
+        <div id="result" class="result-area">
+            Your estimated arrival time will appear here.
+        </div>
+
+        <button id="toggleAdvancedBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+            Show Advanced HOS Options
+        </button>
+
+        <div id="advancedOptions" class="hidden">
+            <h2>Advanced HOS Considerations</h2>
+            <div class="checkbox-group">
+                <input type="checkbox" id="apply14HourRule">
+                <label for="apply14HourRule">Extend to 14-Hour On-Duty Window</label>
+                <p class="tip">If checked, the calculator will assume each driving day utilizes the full 14-hour on-duty window by adding "on-duty, non-driving" time to reach 14 hours (driving + on-duty portion of daily break + additional on-duty time = 14 hours).</p>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="include10HourOffDuty">
+                <label for="include10HourOffDuty">Include 10-Hour Off-Duty Breaks</label>
+                <p class="tip">If checked, the calculator will add a 10-hour off-duty period for each night spent on the road (i.e., between each full driving day).</p>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="consider70HourClock">
+                <label for="consider70HourClock">Consider 70-Hour Clock & 34-Hour Reset</label>
+                <p class="tip">If checked, the calculator will estimate when your cumulative "on-duty" time (driving + on-duty portion of daily breaks + any additional on-duty time from 14-hour rule) would hit the 70-hour limit and add a 34-hour reset for each time this limit is crossed.</p>
+            </div>
+            <div class="advanced-input-group">
+                <label for="current70HourClock">Current 70-Hour Clock Hours (already accumulated):</label>
+                <input type="number" id="current70HourClock" value="0" placeholder="e.g., 25" class="rounded-xl">
+                <p class="tip">Enter your current accumulated on-duty hours towards the 70-hour limit before this trip begins.</p>
+            </div>
+            <div class="advanced-input-group">
+                <label for="bufferPercentage">Additional Buffer for Delays (%):</label>
+                <input type="number" id="bufferPercentage" value="0" placeholder="e.g., 10" class="rounded-xl">
+                <p class="tip">Add a percentage of total travel time to account for unforeseen delays (traffic, loading, etc.). Example: If your calculated travel time is 100 hours, and you add a 10% buffer, the calculator will add 10 hours to your total, making it 110 hours.</p>
+            </div>
+            <div id="advancedResult" class="result-area bg-blue-100 text-teal-800">
+                Advanced ETA will appear here.
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const milesInput = document.getElementById('miles');
+            const speedInput = document.getElementById('speed');
+            const dailyDrivingLimitSelect = document.getElementById('dailyDrivingLimit');
+            const currentTZSelect = document.getElementById('currentTZ');
+            const destinationTZSelect = document.getElementById('destinationTZ');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
+            const advancedOptionsDiv = document.getElementById('advancedOptions');
+            const apply14HourRuleCheckbox = document.getElementById('apply14HourRule');
+            const include10HourOffDutyCheckbox = document.getElementById('include10HourOffDuty');
+            const consider70HourClockCheckbox = document.getElementById('consider70HourClock');
+            const current70HourClockInput = document.getElementById('current70HourClock'); // New input element
+            const bufferPercentageInput = document.getElementById('bufferPercentage');
+            const resultDiv = document.getElementById('result');
+            const advancedResultDiv = document.getElementById('advancedResult');
+            const errorMessageDiv = document.getElementById('errorMessage');
+
+            // Define a comprehensive list of US time zones with their IANA IDs and display names
+            const timeZones = [
+                { id: 'America/New_York', name: 'Eastern Time (ET)' },
+                { id: 'America/Detroit', name: 'Eastern Time (ET) - Michigan' },
+                { id: 'America/Indianapolis', name: 'Eastern Time (ET) - Indiana (East)' },
+                { id: 'America/Chicago', name: 'Central Time (CT)' },
+                { id: 'America/Menominee', name: 'Central Time (CT) - Michigan (UP)' },
+                { id: 'America/North_Dakota/Center', name: 'Central Time (CT) - North Dakota' },
+                { id: 'America/Denver', name: 'Mountain Time (MT)' },
+                { id: 'America/Boise', name: 'Mountain Time (MT) - Idaho (South)' },
+                { id: 'America/Phoenix', name: 'Arizona Time (MST) - No DST' }, // Arizona doesn't observe DST
+                { id: 'America/Los_Angeles', name: 'Pacific Time (PT)' },
+                { id: 'America/Anchorage', name: 'Alaska Time (AKT)' },
+                { id: 'America/Adak', name: 'Hawaii-Aleutian Time (HAT)' },
+                { id: 'Pacific/Honolulu', name: 'Hawaii Standard Time (HST) - No DST' }
+            ];
+
+            // Function to populate time zone dropdowns
+            function populateTimeZones() {
+                timeZones.sort((a, b) => a.name.localeCompare(b.name));
+
+                const defaultOption1 = document.createElement('option');
+                defaultOption1.value = '';
+                defaultOption1.textContent = 'Select your current time zone...';
+                defaultOption1.disabled = true;
+                defaultOption1.selected = true;
+                currentTZSelect.appendChild(defaultOption1);
+
+                const defaultOption2 = document.createElement('option');
+                defaultOption2.value = '';
+                defaultOption2.textContent = 'Select your destination time zone...';
+                defaultOption2.disabled = true;
+                defaultOption2.selected = true;
+                destinationTZSelect.appendChild(defaultOption2);
+
+                timeZones.forEach(tz => {
+                    const option1 = document.createElement('option');
+                    option1.value = tz.id;
+                    option1.textContent = tz.name;
+                    currentTZSelect.appendChild(option1);
+
+                    const option2 = document.createElement('option');
+                    option2.value = tz.id;
+                    option2.textContent = tz.name;
+                    destinationTZSelect.appendChild(option2);
+                });
+
+                try {
+                    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    const matchingTZ = timeZones.find(tz => tz.id === userTimeZone);
+                    if (matchingTZ) {
+                        currentTZSelect.value = userTimeZone;
+                    } else {
+                        currentTZSelect.value = '';
+                    }
+                } catch (e) {
+                    console.error("Could not determine user's time zone:", e);
+                    currentTZSelect.value = '';
+                }
+            }
+
+            populateTimeZones();
+
+            // Function to perform the ETA calculation
+            function calculateETA() {
+                errorMessageDiv.textContent = '';
+                resultDiv.textContent = 'Calculating...';
+                advancedResultDiv.textContent = 'Advanced ETA will appear here.'; // Clear advanced result too
+
+                const totalMiles = parseFloat(milesInput.value);
+                const averageSpeed = parseFloat(speedInput.value);
+                const dailyDrivingLimit = parseFloat(dailyDrivingLimitSelect.value);
+                const currentTZ = currentTZSelect.value;
+                const destinationTZ = destinationTZSelect.value;
+                let current70HourClock = parseFloat(current70HourClockInput.value); // New variable
+                let bufferPercentage = parseFloat(bufferPercentageInput.value);
+
+                // Input validation
+                if (isNaN(totalMiles) || totalMiles <= 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid positive number for total miles.';
+                    resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                    return;
+                }
+                if (isNaN(averageSpeed) || averageSpeed <= 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid positive number for average speed.';
+                    resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                    return;
+                }
+                if (isNaN(dailyDrivingLimit) || dailyDrivingLimit <= 0) {
+                    errorMessageDiv.textContent = 'Please select a valid daily driving limit.';
+                    resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                    return;
+                }
+                if (!currentTZ) {
+                    errorMessageDiv.textContent = 'Please select your current time zone.';
+                    resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                    return;
+                }
+                if (!destinationTZ) {
+                    errorMessageDiv.textContent = 'Please select your destination time zone.';
+                    resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                    return;
+                }
+                if (isNaN(current70HourClock) || current70HourClock < 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid non-negative number for current 70-hour clock. Defaulting to 0.';
+                    current70HourClock = 0;
+                    current70HourClockInput.value = 0;
+                }
+                if (isNaN(bufferPercentage) || bufferPercentage < 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid non-negative number for buffer percentage. Defaulting to 0%.';
+                    bufferPercentage = 0;
+                    bufferPercentageInput.value = 0;
+                }
+
+                // --- Common Calculation Components ---
+                const rawDrivingHours = totalMiles / averageSpeed;
+                const dailyBreakTotal = 1; // 1 hour total daily break (0.5 on-duty, 0.5 off-duty)
+                const dailyBreakOnDutyPortion = 0.5; // 30 mins (pre-trip + post-trip)
+                const dailyBreakOffDutyPortion = 0.5; // 30 mins (driving break)
+
+                // Calculate number of driving days based on the selected daily driving limit
+                const numDrivingDays = rawDrivingHours > 0 ? Math.ceil(rawDrivingHours / dailyDrivingLimit) : 0;
+
+                // --- Basic Calculation ---
+                let totalTravelHoursBasic = rawDrivingHours + (numDrivingDays * dailyBreakTotal);
+
+                const now = new Date();
+                const arrivalTimeMsBasic = now.getTime() + (totalTravelHoursBasic * 60 * 60 * 1000);
+                const rawArrivalDateBasic = new Date(arrivalTimeMsBasic);
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric',
+                    hour: 'numeric', minute: 'numeric', timeZoneName: 'short',
+                    timeZone: destinationTZ, hour12: true
+                });
+                resultDiv.textContent = `Estimated Arrival Time (Basic): ${formatter.format(rawArrivalDateBasic)}`;
+
+                // --- Advanced Calculation (if enabled) ---
+                if (advancedOptionsDiv.classList.contains('block')) { // Only calculate if advanced options are visible
+                    let totalTravelHoursAdvanced = rawDrivingHours; // Start with just driving time for advanced calculation
+
+                    // Calculate total "on-duty" time for the trip, considering only the on-duty portion of daily breaks
+                    // Start with the user's current 70-hour clock value
+                    let totalOnDutyTimeFor70Clock = current70HourClock + (numDrivingDays * dailyBreakOnDutyPortion);
+
+                    // Add the off-duty portion of the daily break to total travel hours
+                    totalTravelHoursAdvanced += (numDrivingDays * dailyBreakOffDutyPortion);
+
+
+                    // Apply "Extend to 14-Hour On-Duty Window" rule
+                    if (apply14HourRuleCheckbox.checked) {
+                        const currentOnDutyPerDrivingDay = dailyDrivingLimit + dailyBreakOnDutyPortion; // Only on-duty portion counts
+                        if (currentOnDutyPerDrivingDay < 14) {
+                            const additionalOnDutyNonDrivingPerDay = 14 - currentOnDutyPerDrivingDay;
+                            // Add this additional non-driving time to total travel hours
+                            totalTravelHoursAdvanced += numDrivingDays * additionalOnDutyNonDrivingPerDay;
+                            // Also add it to the 70-hour clock calculation
+                            totalOnDutyTimeFor70Clock += numDrivingDays * additionalOnDutyNonDrivingPerDay;
+                        }
+                    }
+                    // Add the driving limit and on-duty portion of daily breaks to total travel hours
+                    // This ensures these are always included, whether 14-hour rule applies or not.
+                    // If 14-hour rule was applied, the driving limit and dailyBreakOnDutyPortion
+                    // are already accounted for in `currentOnDutyPerDrivingDay` and `additionalOnDutyNonDrivingPerDay`.
+                    // So, we only add dailyDrivingLimit and dailyBreakOnDutyPortion if the 14-hour rule *wasn't* checked.
+                    if (!apply14HourRuleCheckbox.checked) {
+                         totalTravelHoursAdvanced += (numDrivingDays * dailyDrivingLimit) + (numDrivingDays * dailyBreakOnDutyPortion);
+                    }
+
+
+                    // Add 10-Hour Off-Duty Breaks
+                    if (include10HourOffDutyCheckbox.checked) {
+                        const numOvernightBreaks = numDrivingDays > 1 ? (numDrivingDays - 1) : 0;
+                        totalTravelHoursAdvanced += numOvernightBreaks * 10;
+                    }
+
+                    // Consider 70-Hour Clock & 34-Hour Reset
+                    if (consider70HourClockCheckbox.checked) {
+                        const num70HourBlocks = Math.floor(totalOnDutyTimeFor70Clock / 70);
+                        totalTravelHoursAdvanced += num70HourBlocks * 34;
+                    }
+
+                    // Apply Additional Buffer for Delays
+                    if (bufferPercentage > 0) {
+                        totalTravelHoursAdvanced *= (1 + bufferPercentage / 100);
+                    }
+
+                    const arrivalTimeMsAdvanced = now.getTime() + (totalTravelHoursAdvanced * 60 * 60 * 1000);
+                    const rawArrivalDateAdvanced = new Date(arrivalTimeMsAdvanced);
+                    advancedResultDiv.textContent = `Estimated Arrival Time (Advanced): ${formatter.format(rawArrivalDateAdvanced)}`;
+                }
+            }
+
+            // Event Listeners
+            calculateBtn.addEventListener('click', calculateETA);
+
+            toggleAdvancedBtn.addEventListener('click', () => {
+                advancedOptionsDiv.classList.toggle('hidden');
+                advancedOptionsDiv.classList.toggle('block');
+
+                if (advancedOptionsDiv.classList.contains('block')) {
+                    toggleAdvancedBtn.textContent = 'Hide Advanced HOS Options';
+                    calculateETA();
+                } else {
+                    toggleAdvancedBtn.textContent = 'Show Advanced HOS Options';
+                    advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                }
+            });
+
+            // Recalculate if any input or advanced checkbox changes
+            milesInput.addEventListener('input', calculateETA);
+            speedInput.addEventListener('input', calculateETA);
+            dailyDrivingLimitSelect.addEventListener('change', calculateETA);
+            currentTZSelect.addEventListener('change', calculateETA);
+            destinationTZSelect.addEventListener('change', calculateETA);
+            apply14HourRuleCheckbox.addEventListener('change', calculateETA);
+            include10HourOffDutyCheckbox.addEventListener('change', calculateETA);
+            consider70HourClockCheckbox.addEventListener('change', calculateETA);
+            current70HourClockInput.addEventListener('input', calculateETA); // New event listener
+            bufferPercentageInput.addEventListener('input', calculateETA);
+
+            // Initial calculation when page loads (if default values are set)
+            calculateETA();
+        });
+    </script>
+</body>
+</html>
