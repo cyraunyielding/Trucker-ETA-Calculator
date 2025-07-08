@@ -101,9 +101,13 @@
             width: 100%;
             text-align: center;
             border: 1px solid #e2e8f0; /* Subtle border */
+            /* TEMP DEBUG: Add a border to see container boundaries */
+            /* border: 2px solid purple !important; */
         }
         .title-group {
             margin-bottom: 1.75rem;
+            /* TEMP DEBUG: Add a border to see title-group boundaries */
+            /* border: 2px solid orange !important; */
         }
         .main-title {
             color: #2c3e50; /* Darker title color */
@@ -379,6 +383,8 @@
             margin-bottom: 1.5rem;
             display: flex;
             justify-content: center;
+            /* TEMP DEBUG: Add a border to see logo-container boundaries */
+            /* border: 2px solid blue !important; */
         }
         .logo-container img {
             max-width: 150px;
@@ -2117,6 +2123,7 @@
 
             // --- Comment Modal Functions ---
             function showCommentModal() {
+                console.log("Show Comments button clicked. Opening modal."); // Debugging log
                 commentModal.classList.remove('hidden');
             }
 
@@ -2381,22 +2388,24 @@
             // Load logs for the current date after Firebase authentication is ready
             // The onAuthStateChanged listener at the top of the script will call loadLogsForSelectedDate()
             // once authentication is complete.
+        });
 
-            // PayPal button rendering (Code 2)
-            // Ensure paypal object is available before rendering
+        // PayPal button rendering (Code 2) - Moved to window.onload for better compatibility
+        // This ensures the PayPal SDK is fully loaded and ready before attempting to render the button.
+        window.onload = function () {
             if (typeof paypal !== 'undefined' && paypal.HostedButtons) {
                 paypal.HostedButtons({
                     hostedButtonId: "JSEAH3HWUE9VG",
                 }).render("#paypal-container-JSEAH3HWUE9VG");
+                console.log("PayPal button render attempt successful.");
             } else {
-                console.warn("PayPal SDK not loaded or HostedButtons component not available.");
-                // Optionally hide the container if PayPal button can't render
+                console.warn("PayPal SDK not loaded or HostedButtons component not available on window.onload.");
                 const paypalContainer = document.getElementById('paypal-container-JSEAH3HWUE9VG');
                 if (paypalContainer) {
-                    paypalContainer.innerHTML = '<p class="text-red-500 text-sm">PayPal button could not load.</p>';
+                    paypalContainer.innerHTML = '<p class="text-red-500 text-sm">PayPal button could not load. Please try refreshing the page or check your internet connection.</p>';
                 }
             }
-        });
+        };
     </script>
 </body>
 </html>
