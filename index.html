@@ -65,6 +65,10 @@
         window.getIsAuthReady = () => isAuthReady; // Function to check auth readiness
         window.appId = appId; // Make appId available globally for Firestore paths
     </script>
+    <!-- PayPal SDK Script (Code 1) -->
+    <script
+      src="https://www.paypal.com/sdk/js?client-id=BAACbOyrXuyfxCVaTr03e67fOFNuqQR69H2k8gpGnRc9r3WseW2narbSNIBVLh3uk5JY2dU6S6w8Wwk_UM&components=hosted-buttons&enable-funding=venmo&currency=USD">
+    </script>
     <style>
         /* Custom styles for better aesthetics and responsiveness */
         body {
@@ -128,7 +132,7 @@
             cursor: not-allowed;
             border-color: #ced4da;
         }
-        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn { /* Added new buttons */
+        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn, #updateLocationBtn { /* Added new buttons, including updateLocationBtn */
             background-image: linear-gradient(to right, #4299e1, #3182ce); /* Gradient button */
             color: white;
             padding: 0.85rem 1.75rem;
@@ -142,12 +146,12 @@
             width: 100%; /* Full width button */
             margin-top: 1rem; /* Space between buttons */
         }
-        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover { /* Added new buttons */
+        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover, #updateLocationBtn:hover { /* Added new buttons */
             background-image: linear-gradient(to right, #3182ce, #2b6cb0);
             box-shadow: 0 6px 15px rgba(66, 153, 225, 0.4);
             transform: translateY(-2px); /* Slight lift effect */
         }
-        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active { /* Added new buttons */
+        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active, #updateLocationBtn:active { /* Added new buttons */
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 153, 225, 0.2);
         }
@@ -379,6 +383,16 @@
             margin-bottom: 1rem;
             text-align: center;
         }
+        .disclaimer-note {
+            background-color: #fff3cd; /* Light yellow for warning */
+            border: 1px solid #ffeeba;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #856404; /* Darker yellow text */
+            text-align: center;
+        }
         .log-form {
             background-color: #f8fafc;
             padding: 1rem;
@@ -442,6 +456,13 @@
         .log-summary strong {
             color: #004d40;
         }
+        .location-display {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: #4a5568;
+            text-align: left;
+            min-height: 1.5rem; /* Ensure space even when empty */
+        }
 
         /* Responsive adjustments for advanced section */
         @media (max-width: 640px) {
@@ -494,6 +515,10 @@
                 padding: 0.2rem 0.4rem;
                 font-size: 0.7rem;
             }
+            .disclaimer-note {
+                font-size: 0.8rem;
+                padding: 0.5rem 0.75rem;
+            }
         }
     </style>
 </head>
@@ -532,6 +557,15 @@
             </select>
             <p class="tip">Your device's time zone is pre-selected if possible. This is the starting time zone for your entire trip.</p>
         </div>
+
+        <button id="updateLocationBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+            Update Current Location (GPS)
+        </button>
+        <div id="currentLocationDisplay" class="location-display"></div>
+        <p class="tip">
+            This button provides your current Latitude and Longitude. It does not influence the calculator's logic and your location data is not stored or shared.
+        </p>
+
 
         <div class="input-group">
             <label for="destinationTZ">Destination Time Zone (Leg 1):</label>
@@ -604,6 +638,9 @@
 
         <div id="logSheetSection" class="hidden">
             <h2>Daily Log Sheet</h2>
+            <p id="hosDisclaimer" class="disclaimer-note">
+                The calculator’s HOS logic is a practical simulation, not a full regulatory compliance tool.
+            </p>
             <div class="log-input-group">
                 <label for="logDate">Log Date:</label>
                 <input type="date" id="logDate" class="rounded-xl">
@@ -678,9 +715,18 @@
             <p>Authored by Mark Bird</p>
             <a id="githubLink" href="https://github.com/cyraunyielding" target="_blank" rel="noopener noreferrer">Visit my GitHub</a>
             <a id="issuesLink" href="https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues" target="_blank" rel="noopener noreferrer">Report Issues or Suggestions</a>
+            <p class="text-sm mt-2">
+                *HOS Disclaimer: The calculator’s HOS logic is a practical simulation, not a full regulatory compliance tool.
+            </p>
             <div class="qr-code-container">
                 <img id="qrCodeImage" src="YOUR_QR_CODE_IMAGE_URL_HERE" alt="QR Code to Calculator">
                 <p>Scan to share this calculator!</p>
+            </div>
+
+            <!-- PayPal Button Integration -->
+            <div class="paypal-button-container mt-4">
+                <p class="text-base font-semibold text-gray-700 mb-2">Support This Project:</p>
+                <div id="paypal-container-JSEAH3HWUE9VG"></div>
             </div>
         </div>
     </div>
@@ -715,6 +761,7 @@
             const toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
             const toggleChainingBtn = document.getElementById('toggleChainingBtn');
             const toggleLogSheetBtn = document.getElementById('toggleLogSheetBtn'); // New toggle for log sheet
+            const updateLocationBtn = document.getElementById('updateLocationBtn'); // New location button
             const advancedOptionsDiv = document.getElementById('advancedOptions');
             const chainingOptionsDiv = document.getElementById('chainingOptions');
             const logSheetSection = document.getElementById('logSheetSection'); // New log sheet section
@@ -731,6 +778,7 @@
             const resultDiv = document.getElementById('result');
             const advancedResultDiv = document.getElementById('advancedResult');
             const errorMessageDiv = document.getElementById('errorMessage');
+            const currentLocationDisplay = document.getElementById('currentLocationDisplay'); // New location display
 
             // Chaining specific elements
             const legsContainer = document.getElementById('legsContainer');
@@ -821,6 +869,53 @@
 
             // Set log date to today by default
             logDateInput.value = formatDateForFirestore(new Date());
+
+            // --- Geolocation Functionality ---
+            updateLocationBtn.addEventListener('click', () => {
+                if (navigator.geolocation) {
+                    currentLocationDisplay.textContent = 'Getting location...';
+                    errorMessageDiv.textContent = '';
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const lat = position.coords.latitude.toFixed(6);
+                            const lon = position.coords.longitude.toFixed(6);
+                            currentLocationDisplay.textContent = `Lat: ${lat}, Lon: ${lon}`;
+                            // You could potentially use these coordinates to auto-fill a location in the log sheet,
+                            // or for future features like reverse geocoding to get an address.
+                            // For now, just displaying them.
+                        },
+                        (error) => {
+                            let msg = 'Error getting location: ';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED:
+                                    msg += "User denied the request for Geolocation.";
+                                    break;
+                                case error.POSITION_UNAVAILABLE:
+                                    msg += "Location information is unavailable.";
+                                    break;
+                                case error.TIMEOUT:
+                                    msg += "The request to get user location timed out.";
+                                    break;
+                                case error.UNKNOWN_ERROR:
+                                    msg += "An unknown error occurred.";
+                                    break;
+                            }
+                            currentLocationDisplay.textContent = ''; // Clear loading message
+                            errorMessageDiv.textContent = msg;
+                            console.error("Geolocation error:", error);
+                        },
+                        {
+                            enableHighAccuracy: true, // Request the best possible result
+                            timeout: 10000,           // Maximum time (ms) to wait for a position
+                            maximumAge: 0             // Don't use a cached position
+                        }
+                    );
+                } else {
+                    errorMessageDiv.textContent = 'Geolocation is not supported by your browser.';
+                    currentLocationDisplay.textContent = '';
+                }
+            });
+
 
             // --- Log Sheet Functions ---
             let currentDayLogs = []; // Array to hold logs for the currently selected date
@@ -1417,7 +1512,7 @@
                         const num70HourBlocks = Math.floor(currentCumulativeOnDutyTimeFor70Clock / 70);
                         if (num70HourBlocks > 0) {
                             legHoursAddedToTotalTrip += num70HourBlocks * 34; // Add 34-hour reset time to this leg's total
-                            currentCumulativeOnDutyTimeFor70Clock -= (num70HourBlocks * 70); // Reset 70-hour clock for next segment
+                            currentCumulativeOnDutyTimeFor70Clock -= (num70HourBlocks * 70);
                         }
                     }
 
@@ -1541,6 +1636,7 @@
                 resultDiv.textContent = 'Your estimated arrival time will appear here.';
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
                 errorMessageDiv.textContent = '';
+                currentLocationDisplay.textContent = ''; // Clear location display
 
                 // Clear all dynamically added legs
                 legsContainer.innerHTML = '';
@@ -1666,6 +1762,21 @@
             // Load logs for the current date after Firebase authentication is ready
             // The onAuthStateChanged listener at the top of the script will call loadLogsForSelectedDate()
             // once authentication is complete.
+
+            // PayPal button rendering (Code 2)
+            // Ensure paypal object is available before rendering
+            if (typeof paypal !== 'undefined' && paypal.HostedButtons) {
+                paypal.HostedButtons({
+                    hostedButtonId: "JSEAH3HWUE9VG",
+                }).render("#paypal-container-JSEAH3HWUE9VG");
+            } else {
+                console.warn("PayPal SDK not loaded or HostedButtons component not available.");
+                // Optionally hide the container if PayPal button can't render
+                const paypalContainer = document.getElementById('paypal-container-JSEAH3HWUE9VG');
+                if (paypalContainer) {
+                    paypalContainer.innerHTML = '<p class="text-red-500 text-sm">PayPal button could not load.</p>';
+                }
+            }
         });
     </script>
 </body>
