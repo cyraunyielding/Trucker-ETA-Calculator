@@ -248,6 +248,59 @@
             text-align: center;
         }
 
+        .footer-content {
+            margin-top: 2.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            color: #718096;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .footer-content a {
+            color: #4299e1;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer-content a:hover {
+            text-decoration: underline;
+        }
+        .qr-code-container {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .qr-code-container img {
+            width: 100px;
+            height: 100px;
+            border: 1px solid #cbd5e0;
+            border-radius: 0.5rem;
+            padding: 5px;
+            background-color: white;
+        }
+        .qr-code-container p {
+            font-size: 0.75rem;
+            color: #718096;
+        }
+        .logo-container {
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: center;
+        }
+        .logo-container img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            background-color: #f0f4f8; /* Light background for logo */
+            padding: 10px;
+        }
+
+
         /* Responsive adjustments for advanced section */
         @media (max-width: 640px) {
             #advancedOptions h2, #chainingOptions h2 {
@@ -281,11 +334,24 @@
                 top: 0.75rem;
                 right: 0.75rem;
             }
+            .logo-container img {
+                max-width: 120px;
+            }
+            .footer-content {
+                font-size: 0.75rem;
+            }
+            .qr-code-container img {
+                width: 80px;
+                height: 80px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo-container">
+            <img id="truckLogo" src="YOUR_TRUCK_LOGO_IMAGE_URL_HERE" alt="Trucker ETA Logo">
+        </div>
         <h1 class="title">Trucker ETA Calculator</h1>
 
         <div class="input-group">
@@ -363,6 +429,11 @@
                 <input type="number" id="bufferPercentage" placeholder="e.g., 0" class="rounded-xl">
                 <p class="tip">Add a percentage of total travel time to account for unforeseen delays (traffic, loading, etc.). Example: If your calculated travel time is 100 hours, and you add a 10% buffer, the calculator will add 10 hours to your total, making it 110 hours.</p>
             </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="enableRoundTrip">
+                <label for="enableRoundTrip">Enable Round Trip</label>
+                <p class="tip">If checked, the calculator will add a return leg from your final destination back to your starting time zone, using the total miles of all forward legs.</p>
+            </div>
         </div>
 
         <button id="toggleChainingBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
@@ -382,6 +453,16 @@
         </div>
 
         <div id="errorMessage" class="error-message"></div>
+
+        <div class="footer-content">
+            <p>Authored by Mark Bird</p>
+            <a id="githubLink" href="https://github.com/cyraunyielding" target="_blank" rel="noopener noreferrer">Visit my GitHub</a>
+            <a id="issuesLink" href="https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues" target="_blank" rel="noopener noreferrer">Report Issues or Suggestions</a>
+            <div class="qr-code-container">
+                <img id="qrCodeImage" src="YOUR_QR_CODE_IMAGE_URL_HERE" alt="QR Code to Calculator">
+                <p>Scan to share this calculator!</p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -407,6 +488,7 @@
             const consider70HourClockCheckbox = document.getElementById('consider70HourClock');
             const current70HourClockInput = document.getElementById('current70HourClock');
             const bufferPercentageInput = document.getElementById('bufferPercentage');
+            const enableRoundTripCheckbox = document.getElementById('enableRoundTrip'); // New Round Trip checkbox
 
             // Results and error display
             const resultDiv = document.getElementById('result');
@@ -417,6 +499,12 @@
             const legsContainer = document.getElementById('legsContainer');
             const addLegBtn = document.getElementById('addLegBtn');
             let legCounter = 1; // Start at 1, as the first leg is in the main section
+
+            // Branding elements
+            const truckLogo = document.getElementById('truckLogo');
+            const githubLink = document.getElementById('githubLink');
+            const issuesLink = document.getElementById('issuesLink'); // New issues link
+            const qrCodeImage = document.getElementById('qrCodeImage');
 
             // Define a comprehensive list of US time zones with their IANA IDs and display names
             const timeZones = [
@@ -528,8 +616,8 @@
 
                 const avgSpeed = parseFloat(speedInput.value);
                 const dailyDriveLimit = parseFloat(dailyDrivingLimitSelect.value);
-                let current70HrClock = parseFloat(current70HourClockInput.value);
-                let bufferPct = parseFloat(bufferPercentageInput.value);
+                let current70HrClock = parseFloat(current70HourClockInput.value); // Will be NaN if empty, handled below
+                let bufferPct = parseFloat(bufferPercentageInput.value); // Will be NaN if empty, handled below
 
                 // Input validation for global fields
                 if (isNaN(avgSpeed) || avgSpeed <= 0) {
@@ -561,6 +649,7 @@
                 const dailyBreakOffDutyPortion = 0.5;
 
                 const allLegsData = [];
+                let totalForwardMiles = 0; // To sum up miles for round trip
 
                 // --- Process Leg 1 (from main section) ---
                 const leg1Miles = parseFloat(milesInput.value);
@@ -575,6 +664,7 @@
                     return;
                 }
                 allLegsData.push({ miles: leg1Miles, destTZ: leg1DestinationTZ });
+                totalForwardMiles += leg1Miles;
 
                 // --- Process dynamically added legs ---
                 const dynamicLegSections = legsContainer.querySelectorAll('.leg-section');
@@ -594,6 +684,7 @@
                         return;
                     }
                     allLegsData.push({ miles: miles, destTZ: destTZ });
+                    totalForwardMiles += miles;
                 });
 
                 if (allLegsData.length === 0) { // If any validation failed, allLegsData might be empty
@@ -623,9 +714,10 @@
                     // Add daily on-duty break portion to 70-hour clock for this leg (always counts towards 70)
                     legOnDutyHoursFor70Clock += (numDrivingDaysForLeg * dailyBreakOnDutyPortion);
 
+
                     // Apply "Extend to 14-Hour On-Duty Window" rule
                     if (apply14HourRuleCheckbox.checked) {
-                        const currentOnDutyPerDrivingDay = dailyDriveLimit + dailyBreakOnDutyPortion;
+                        const currentOnDutyPerDrivingDay = dailyDriveLimit + dailyBreakOnDutyPortion; // Only on-duty portion of break counts towards 14-hour window
                         if (currentOnDutyPerDrivingDay < 14) {
                             const additionalOnDutyNonDrivingPerDay = 14 - currentOnDutyPerDrivingDay;
                             legHoursAddedToTotalTrip += numDrivingDaysForLeg * additionalOnDutyNonDrivingPerDay;
@@ -639,7 +731,7 @@
                         legHoursAddedToTotalTrip += numOvernightBreaksForLeg * 10;
                     }
 
-                    // Update cumulative 70-hour clock with on-duty hours from this leg
+                    // Update cumulative 70-hour clock
                     currentCumulativeOnDutyTimeFor70Clock += legOnDutyHoursFor70Clock;
 
                     // Consider 70-Hour Clock & 34-Hour Reset (applied cumulatively across legs)
@@ -671,6 +763,60 @@
                     // The currentLegOriginTZ is implicitly handled by using the previous leg's destTZ for the next leg's calculation
                 });
 
+                // --- Add Round Trip Leg if enabled ---
+                if (enableRoundTripCheckbox.checked) {
+                    const returnMiles = totalForwardMiles; // Total miles for the return trip
+                    const returnDestinationTZ = currentTZSelect.value; // Back to original start TZ
+
+                    const returnDrivingHours = returnMiles / avgSpeed;
+                    const numDrivingDaysForReturnLeg = returnDrivingHours > 0 ? Math.ceil(returnDrivingHours / dailyDriveLimit) : 0;
+
+                    let returnLegHoursAddedToTotalTrip = returnDrivingHours;
+                    let returnLegOnDutyHoursFor70Clock = returnDrivingHours;
+
+                    returnLegHoursAddedToTotalTrip += (numDrivingDaysForReturnLeg * dailyBreakOffDutyPortion);
+                    returnLegOnDutyHoursFor70Clock += (numDrivingDaysForReturnLeg * dailyBreakOnDutyPortion);
+
+                    if (apply14HourRuleCheckbox.checked) {
+                        const currentOnDutyPerDrivingDay = dailyDriveLimit + dailyBreakOnDutyPortion;
+                        if (currentOnDutyPerDrivingDay < 14) {
+                            const additionalOnDutyNonDrivingPerDay = 14 - currentOnDutyPerDrivingDay;
+                            returnLegHoursAddedToTotalTrip += numDrivingDaysForReturnLeg * additionalOnDutyNonDrivingPerDay;
+                            returnLegOnDutyHoursFor70Clock += numDrivingDaysForReturnLeg * additionalOnDutyNonDrivingPerDay;
+                        }
+                    }
+
+                    if (include10HourOffDutyCheckbox.checked) {
+                        const numOvernightBreaksForReturnLeg = numDrivingDaysForReturnLeg > 1 ? (numDrivingDaysForReturnLeg - 1) : 0;
+                        returnLegHoursAddedToTotalTrip += numOvernightBreaksForReturnLeg * 10;
+                    }
+
+                    currentCumulativeOnDutyTimeFor70Clock += returnLegOnDutyHoursFor70Clock;
+
+                    if (consider70HourClockCheckbox.checked) {
+                        const num70HourBlocks = Math.floor(currentCumulativeOnDutyTimeFor70Clock / 70);
+                        if (num70HourBlocks > 0) {
+                            returnLegHoursAddedToTotalTrip += num70HourBlocks * 34;
+                            currentCumulativeOnDutyTimeFor70Clock -= (num70HourBlocks * 70);
+                        }
+                    }
+
+                    currentTotalTripHours += returnLegHoursAddedToTotalTrip;
+
+                    const tripStartTime = new Date();
+                    const returnArrivalTimeMs = tripStartTime.getTime() + (currentTotalTripHours * 60 * 60 * 1000);
+                    const returnArrivalDate = new Date(returnArrivalTimeMs);
+
+                    const returnFormatter = new Intl.DateTimeFormat('en-US', {
+                        year: 'numeric', month: 'long', day: 'numeric',
+                        hour: 'numeric', minute: 'numeric', timeZoneName: 'short',
+                        timeZone: returnDestinationTZ,
+                        hour12: true
+                    });
+                    const formattedReturnArrival = returnFormatter.format(returnArrivalDate);
+                    legSummaries.push(`Return Trip (to ${returnDestinationTZ}): Arrives ${formattedReturnArrival}`);
+                }
+
 
                 // Apply Additional Buffer for Delays to the *final* total trip hours
                 if (bufferPct > 0) {
@@ -683,7 +829,7 @@
                 const finalFormatter = new Intl.DateTimeFormat('en-US', {
                     year: 'numeric', month: 'long', day: 'numeric',
                     hour: 'numeric', minute: 'numeric', timeZoneName: 'short',
-                    timeZone: allLegsData[allLegsData.length - 1].destTZ, // Final destination TZ of the last leg
+                    timeZone: enableRoundTripCheckbox.checked ? currentTZSelect.value : allLegsData[allLegsData.length - 1].destTZ, // Final destination TZ of the last leg or original start TZ if round trip
                     hour12: true
                 });
                 const formattedFinalArrival = finalFormatter.format(finalArrivalDate);
@@ -705,6 +851,7 @@
                 apply14HourRuleCheckbox.checked = false;
                 include10HourOffDutyCheckbox.checked = false;
                 consider70HourClockCheckbox.checked = false;
+                enableRoundTripCheckbox.checked = false; // Reset Round Trip checkbox
                 resultDiv.textContent = 'Your estimated arrival time will appear here.';
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
                 errorMessageDiv.textContent = '';
@@ -738,7 +885,8 @@
             toggleAdvancedBtn.addEventListener('click', () => {
                 advancedOptionsDiv.classList.toggle('hidden');
                 advancedOptionsDiv.classList.toggle('block');
-                calculateETA(); // Recalculate when visibility changes
+                // Only recalculate if advanced options are now visible OR if they were just hidden and we need to update the basic result
+                calculateETA();
             });
 
             toggleChainingBtn.addEventListener('click', () => {
@@ -766,6 +914,36 @@
             consider70HourClockCheckbox.addEventListener('change', calculateETA);
             current70HourClockInput.addEventListener('input', calculateETA);
             bufferPercentageInput.addEventListener('input', calculateETA);
+            enableRoundTripCheckbox.addEventListener('change', calculateETA); // New event listener for round trip checkbox
+
+            // --- Branding Static Image Setup ---
+            // Instructions for user:
+            // 1. Upload your truck logo image (e.g., truck_logo.png) to your GitHub repository.
+            //    A good place might be a new folder like 'images' in your repo's root.
+            // 2. Get the direct URL to that image. On GitHub, navigate to the image file,
+            //    then right-click on the image itself and select "Copy image address".
+            // 3. Replace 'YOUR_TRUCK_LOGO_IMAGE_URL_HERE' below with that copied URL.
+
+            // 4. Generate your QR code image (e.g., qr_code.png) that links to your live calculator:
+            //    https://cyraunyielding.github.io/Trucker-ETA-Calculator/
+            //    You can use an online QR code generator for this.
+            // 5. Upload this QR code image to your GitHub repository (e.g., in the 'images' folder).
+            // 6. Get the direct URL to that QR code image.
+            // 7. Replace 'YOUR_QR_CODE_IMAGE_URL_HERE' below with that copied URL.
+
+            // Example of how to set the URLs:
+            // truckLogo.src = "https://raw.githubusercontent.com/cyraunyielding/Trucker-ETA-Calculator/main/images/truck_logo.png";
+            // qrCodeImage.src = "https://raw.githubusercontent.com/cyraunyielding/Trucker-ETA-Calculator/main/images/qr_code.png";
+
+            // Placeholder URLs for now - YOU NEED TO REPLACE THESE!
+            truckLogo.src = "https://placehold.co/150x100/e0f4f8/2c3e50?text=Upload+Logo";
+            qrCodeImage.src = "https://placehold.co/100x100/e0f4f8/2c3e50?text=Upload+QR";
+
+            // Set GitHub Link (already correct)
+            githubLink.href = "https://github.com/cyraunyielding";
+            // Set Issues Link (already correct)
+            issuesLink.href = "https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues";
+
 
             // Initial calculation when page loads
             calculateETA();
