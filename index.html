@@ -6,6 +6,65 @@
     <title>Trucker ETA Calculator</title>
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, onSnapshot, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Your web app's Firebase configuration - EMBEDDED HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyA8_guHEaQwhFaSziqPMQIKVHdk4A0LSPA",
+            authDomain: "truckerpro-15e99.firebaseapp.com",
+            projectId: "truckerpro-15e99",
+            storageBucket: "truckerpro-15e99.firebasestorage.app",
+            messagingSenderId: "44586799726",
+            appId: "1:44586799726:web:e32b82837133b128dc8c7f",
+            measurementId: "G-8NK9D8H849"
+        };
+
+        // Define a fixed app ID for Firestore path since we are not in Canvas environment
+        const appId = 'trucker-eta-calculator-app'; // This will be used in your Firestore paths
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null; // Will store the authenticated user's ID
+        let isAuthReady = false; // Flag to indicate if authentication is complete
+
+        // Authenticate user and set up auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("Firebase authenticated. User ID:", userId);
+                isAuthReady = true;
+                // Load logs for the current date after authentication
+                loadLogsForSelectedDate();
+                // If linking is enabled, update HOS from logs immediately
+                if (document.getElementById('linkLogsToCalculator').checked) {
+                    updateHOSFromLogs();
+                }
+            } else {
+                // Sign in anonymously if no user is authenticated
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Firebase authentication error:", error);
+                    document.getElementById('errorMessage').textContent = "Authentication failed. Log sheet features may not work.";
+                }
+            }
+        });
+
+        // Make Firebase instances and userId globally accessible in the script
+        window.firebaseApp = app;
+        window.firebaseDb = db;
+        window.firebaseAuth = auth;
+        window.getFirebaseUserId = () => userId; // Function to get userId
+        window.getIsAuthReady = () => isAuthReady; // Function to check auth readiness
+        window.appId = appId; // Make appId available globally for Firestore paths
+    </script>
     <style>
         /* Custom styles for better aesthetics and responsiveness */
         body {
@@ -63,7 +122,13 @@
             border-color: #4299e1; /* Blue focus border */
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5); /* Blue glow on focus */
         }
-        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, .add-leg-btn, .remove-leg-btn { /* Added new buttons */
+        .input-group input[readonly],
+        .input-group select[readonly] {
+            background-color: #e9ecef; /* Light gray for read-only fields */
+            cursor: not-allowed;
+            border-color: #ced4da;
+        }
+        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn { /* Added new buttons */
             background-image: linear-gradient(to right, #4299e1, #3182ce); /* Gradient button */
             color: white;
             padding: 0.85rem 1.75rem;
@@ -77,26 +142,26 @@
             width: 100%; /* Full width button */
             margin-top: 1rem; /* Space between buttons */
         }
-        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover { /* Added new buttons */
+        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover { /* Added new buttons */
             background-image: linear-gradient(to right, #3182ce, #2b6cb0);
             box-shadow: 0 6px 15px rgba(66, 153, 225, 0.4);
             transform: translateY(-2px); /* Slight lift effect */
         }
-        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, .add-leg-btn:active, .remove-leg-btn:active { /* Added new buttons */
+        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active { /* Added new buttons */
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 153, 225, 0.2);
         }
-        #resetBtn { /* Specific style for reset button */
+        #resetBtn, .delete-log-btn { /* Specific style for reset and delete buttons */
             background-image: linear-gradient(to right, #e53e3e, #c53030); /* Red gradient */
             margin-top: 0.75rem; /* Slightly less margin than others */
         }
-        #resetBtn:hover {
+        #resetBtn:hover, .delete-log-btn:hover {
             background-image: linear-gradient(to right, #c53030, #a02020);
         }
-        #toggleAdvancedBtn, #toggleChainingBtn { /* Grey buttons for toggles */
+        #toggleAdvancedBtn, #toggleChainingBtn, #toggleLogSheetBtn { /* Grey buttons for toggles */
             background-image: linear-gradient(to right, #607d8b, #455a64);
         }
-        #toggleAdvancedBtn:hover, #toggleChainingBtn:hover {
+        #toggleAdvancedBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover {
             background-image: linear-gradient(to right, #455a64, #37474f);
         }
         .result-area {
@@ -128,13 +193,13 @@
         }
 
         /* Advanced Options Styling */
-        #advancedOptions, #chainingOptions { /* Apply to both advanced and chaining sections */
+        #advancedOptions, #chainingOptions, #logSheetSection { /* Apply to all collapsible sections */
             border-top: 1px solid #e2e8f0;
             margin-top: 2rem;
             padding-top: 1.5rem;
             text-align: left;
         }
-        #advancedOptions h2, #chainingOptions h2 {
+        #advancedOptions h2, #chainingOptions h2, #logSheetSection h2 {
             font-size: 1.5rem;
             font-weight: 700;
             color: #2c3e50;
@@ -169,19 +234,19 @@
             font-size: 0.8rem; /* Slightly smaller for tips */
             color: #718096;
         }
-        .advanced-input-group, .leg-input-group { /* For buffer percentage, 70-hour input, and leg inputs */
+        .advanced-input-group, .leg-input-group, .log-input-group { /* For buffer percentage, 70-hour input, and leg inputs */
             margin-top: 1rem;
             margin-bottom: 1.25rem;
             text-align: left;
         }
-        .advanced-input-group label, .leg-input-group label {
+        .advanced-input-group label, .leg-input-group label, .log-input-group label {
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
             color: #4a5568;
             font-size: 1rem;
         }
-        .advanced-input-group input, .leg-input-group input, .leg-input-group select {
+        .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea {
             width: 100%;
             padding: 0.75rem 1rem;
             border: 2px solid #cbd5e0;
@@ -191,7 +256,7 @@
             outline: none;
             transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
-        .advanced-input-group input:focus, .leg-input-group input:focus, .leg-input-group select:focus {
+        .advanced-input-group input:focus, .leg-input-group input:focus, .leg-input-group select:focus, .log-input-group input:focus, .log-input-group select:focus, .log-input-group textarea:focus {
             border-color: #4299e1;
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
         }
@@ -300,10 +365,87 @@
             padding: 10px;
         }
 
+        /* Log Sheet Specific Styles */
+        #logSheetSection {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            text-align: left;
+        }
+        #logSheetSection h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .log-form {
+            background-color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .log-table-container {
+            overflow-x: auto; /* Allows horizontal scrolling on small screens */
+            margin-top: 1.5rem;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .log-table th, .log-table td {
+            border: 1px solid #cbd5e0;
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .log-table th {
+            background-color: #edf2f7;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .log-table tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+        .log-table tr:hover {
+            background-color: #ebf8ff;
+        }
+        .log-table td:last-child { /* Actions column */
+            white-space: nowrap; /* Prevent buttons from wrapping */
+        }
+        .log-table .edit-log-btn, .log-table .delete-log-btn {
+            width: auto;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            margin: 0.2rem;
+            box-shadow: none;
+            display: inline-block; /* Allow them to sit side-by-side */
+        }
+        .log-summary {
+            background-color: #e0f7fa;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-top: 1.5rem;
+            border: 1px solid #b2ebf2;
+            color: #00796b;
+            font-weight: 600;
+            text-align: left;
+        }
+        .log-summary p {
+            margin-bottom: 0.5rem;
+        }
+        .log-summary p:last-child {
+            margin-bottom: 0;
+        }
+        .log-summary strong {
+            color: #004d40;
+        }
 
         /* Responsive adjustments for advanced section */
         @media (max-width: 640px) {
-            #advancedOptions h2, #chainingOptions h2 {
+            #advancedOptions h2, #chainingOptions h2, #logSheetSection h2 {
                 font-size: 1.25rem;
             }
             .checkbox-group {
@@ -317,10 +459,10 @@
                 font-size: 0.7rem; /* Even smaller on mobile */
                 margin-left: calc(1.2em + 0.75rem); /* Maintain indent */
             }
-            .advanced-input-group label, .leg-input-group label {
+            .advanced-input-group label, .leg-input-group label, .log-input-group label {
                 font-size: 0.9rem;
             }
-            .advanced-input-group input, .leg-input-group input, .leg-input-group select {
+            .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea {
                 padding: 0.6rem 0.8rem;
                 font-size: 0.9rem;
             }
@@ -343,6 +485,14 @@
             .qr-code-container img {
                 width: 80px;
                 height: 80px;
+            }
+            .log-table th, .log-table td {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+            .log-table .edit-log-btn, .log-table .delete-log-btn {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -448,6 +598,76 @@
             <button id="addLegBtn" class="add-leg-btn rounded-xl">Add Another Destination Leg</button>
         </div>
 
+        <button id="toggleLogSheetBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+            Show Log Sheet Tracker
+        </button>
+
+        <div id="logSheetSection" class="hidden">
+            <h2>Daily Log Sheet</h2>
+            <div class="log-input-group">
+                <label for="logDate">Log Date:</label>
+                <input type="date" id="logDate" class="rounded-xl">
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="linkLogsToCalculator">
+                <label for="linkLogsToCalculator">Link Logs to ETA Calculator</label>
+                <p class="tip">If checked, the "Current 70-Hour Clock Hours" and "Estimated Daily Driving Limit" in the Advanced HOS Options will automatically update based on your log entries. Otherwise, they will remain manual.</p>
+            </div>
+
+            <div class="log-form">
+                <h3>Add/Edit Log Entry</h3>
+                <div class="log-input-group">
+                    <label for="startTime">Start Time:</label>
+                    <input type="time" id="startTime" class="rounded-xl">
+                </div>
+                <div class="log-input-group">
+                    <label for="endTime">End Time:</label>
+                    <input type="time" id="endTime" class="rounded-xl">
+                </div>
+                <div class="log-input-group">
+                    <label for="dutyStatus">Duty Status:</label>
+                    <select id="dutyStatus" class="rounded-xl">
+                        <option value="">Select Status</option>
+                        <option value="Off-Duty">Off-Duty</option>
+                        <option value="Sleeper Berth">Sleeper Berth</option>
+                        <option value="Driving">Driving</option>
+                        <option value="On-Duty Not Driving">On-Duty Not Driving</option>
+                    </select>
+                </div>
+                <div class="log-input-group">
+                    <label for="logRemarks">Location/Remarks:</label>
+                    <textarea id="logRemarks" rows="2" placeholder="e.g., New York, NY / Pre-trip inspection" class="rounded-xl"></textarea>
+                </div>
+                <button id="addLogEntryBtn" class="rounded-xl">Add Log Entry</button>
+            </div>
+
+            <div class="log-table-container">
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Location/Remarks</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logEntriesTableBody">
+                        <!-- Log entries will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="log-summary" id="dailyLogSummary">
+                <p><strong>Daily Driving:</strong> 0h 0m</p>
+                <p><strong>Daily On-Duty:</strong> 0h 0m</p>
+                <p><strong>Daily Off-Duty:</strong> 0h 0m</p>
+                <p><strong>Daily Sleeper:</strong> 0h 0m</p>
+            </div>
+        </div>
+
         <div id="advancedResult" class="result-area bg-blue-100 text-teal-800">
             Advanced ETA will appear here.
         </div>
@@ -466,7 +686,22 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        // Ensure Firebase instances are available globally (from the module script in head)
+        let db;
+        let auth;
+        let getFirebaseUserId;
+        let getIsAuthReady; // New function to check auth readiness
+        let appId; // Global appId
+
+        // Wait for the DOM to be fully loaded and Firebase to be initialized
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Assign global Firebase instances once available
+            db = window.firebaseDb;
+            auth = window.firebaseAuth;
+            getFirebaseUserId = window.getFirebaseUserId;
+            getIsAuthReady = window.getIsAuthReady;
+            appId = window.appId; // This will now be 'trucker-eta-calculator-app'
+
             // Global inputs (now representing Leg 1)
             const milesInput = document.getElementById('miles'); // Now for Leg 1
             const speedInput = document.getElementById('speed');
@@ -479,8 +714,10 @@
             const resetBtn = document.getElementById('resetBtn');
             const toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
             const toggleChainingBtn = document.getElementById('toggleChainingBtn');
+            const toggleLogSheetBtn = document.getElementById('toggleLogSheetBtn'); // New toggle for log sheet
             const advancedOptionsDiv = document.getElementById('advancedOptions');
             const chainingOptionsDiv = document.getElementById('chainingOptions');
+            const logSheetSection = document.getElementById('logSheetSection'); // New log sheet section
 
             // Advanced HOS options
             const apply14HourRuleCheckbox = document.getElementById('apply14HourRule');
@@ -488,7 +725,7 @@
             const consider70HourClockCheckbox = document.getElementById('consider70HourClock');
             const current70HourClockInput = document.getElementById('current70HourClock');
             const bufferPercentageInput = document.getElementById('bufferPercentage');
-            const enableRoundTripCheckbox = document.getElementById('enableRoundTrip'); // New Round Trip checkbox
+            const enableRoundTripCheckbox = document.getElementById('enableRoundTrip');
 
             // Results and error display
             const resultDiv = document.getElementById('result');
@@ -500,10 +737,21 @@
             const addLegBtn = document.getElementById('addLegBtn');
             let legCounter = 1; // Start at 1, as the first leg is in the main section
 
+            // Log Sheet specific elements
+            const logDateInput = document.getElementById('logDate');
+            const linkLogsToCalculatorCheckbox = document.getElementById('linkLogsToCalculator');
+            const startTimeInput = document.getElementById('startTime');
+            const endTimeInput = document.getElementById('endTime');
+            const dutyStatusSelect = document.getElementById('dutyStatus');
+            const logRemarksInput = document.getElementById('logRemarks');
+            const addLogEntryBtn = document.getElementById('addLogEntryBtn');
+            const logEntriesTableBody = document.getElementById('logEntriesTableBody');
+            const dailyLogSummary = document.getElementById('dailyLogSummary');
+
             // Branding elements
             const truckLogo = document.getElementById('truckLogo');
             const githubLink = document.getElementById('githubLink');
-            const issuesLink = document.getElementById('issuesLink'); // New issues link
+            const issuesLink = document.getElementById('issuesLink');
             const qrCodeImage = document.getElementById('qrCodeImage');
 
             // Define a comprehensive list of US time zones with their IANA IDs and display names
@@ -563,6 +811,434 @@
                 currentTZSelect.value = '';
             }
 
+            // Utility function to format date for Firestore document ID (YYYY-MM-DD)
+            function formatDateForFirestore(dateObj) {
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            // Set log date to today by default
+            logDateInput.value = formatDateForFirestore(new Date());
+
+            // --- Log Sheet Functions ---
+            let currentDayLogs = []; // Array to hold logs for the currently selected date
+
+            // Function to save logs for the current day to Firestore
+            async function saveCurrentDayLogs() {
+                const userId = getFirebaseUserId();
+                if (!userId || !db || !getIsAuthReady()) {
+                    console.warn("User not authenticated or Firestore not ready. Cannot save logs.");
+                    errorMessageDiv.textContent = "Authentication not ready. Cannot save logs.";
+                    return;
+                }
+
+                const selectedDate = logDateInput.value;
+                if (!selectedDate) {
+                    errorMessageDiv.textContent = "Please select a date for the log entry.";
+                    return;
+                }
+
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/log_sheets`, selectedDate);
+                try {
+                    // Firestore has limitations on deeply nested arrays, so we stringify the array of entries
+                    await setDoc(docRef, { entries: JSON.stringify(currentDayLogs) });
+                    console.log(`Logs for ${selectedDate} saved successfully.`);
+                    errorMessageDiv.textContent = ''; // Clear any previous error
+                    calculateDailySummary(); // Recalculate summary after saving
+                    if (linkLogsToCalculatorCheckbox.checked) {
+                        // Trigger HOS calculation from logs and update ETA
+                        updateHOSFromLogs();
+                    }
+                } catch (e) {
+                    console.error("Error saving logs:", e);
+                    errorMessageDiv.textContent = "Error saving log entry. Please try again.";
+                }
+            }
+
+            // Function to load logs for a specific date from Firestore
+            function loadLogsForSelectedDate() {
+                const userId = getFirebaseUserId();
+                if (!userId || !db || !getIsAuthReady()) {
+                    // console.warn("User not authenticated or Firestore not ready. Cannot load logs.");
+                    return; // Don't show error, as this might be called before auth is ready
+                }
+
+                const selectedDate = logDateInput.value;
+                if (!selectedDate) {
+                    logEntriesTableBody.innerHTML = '';
+                    currentDayLogs = [];
+                    calculateDailySummary();
+                    return;;
+                }
+
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/log_sheets`, selectedDate);
+
+                // Use onSnapshot for real-time updates
+                onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        try {
+                            currentDayLogs = JSON.parse(data.entries || '[]');
+                        } catch (e) {
+                            console.error("Error parsing log entries from Firestore:", e);
+                            currentDayLogs = [];
+                        }
+                    } else {
+                        currentDayLogs = []; // No logs for this date
+                    }
+                    renderLogEntries();
+                    calculateDailySummary();
+                    if (linkLogsToCalculatorCheckbox.checked) {
+                        updateHOSFromLogs();
+                    }
+                }, (error) => {
+                    console.error("Error fetching real-time logs:", error);
+                    errorMessageDiv.textContent = "Error loading log entries.";
+                    currentDayLogs = [];
+                    renderLogEntries();
+                    calculateDailySummary();
+                });
+            }
+
+            // Function to render log entries in the table
+            function renderLogEntries() {
+                logEntriesTableBody.innerHTML = '';
+                if (currentDayLogs.length === 0) {
+                    logEntriesTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No log entries for this date.</td></tr>';
+                    return;
+                }
+
+                currentDayLogs.sort((a, b) => {
+                    const timeA = new Date(`2000/01/01 ${a.startTime}`);
+                    const timeB = new Date(`2000/01/01 ${b.startTime}`);
+                    return timeA - timeB;
+                });
+
+                currentDayLogs.forEach((entry, index) => {
+                    const row = logEntriesTableBody.insertRow();
+                    const duration = calculateDuration(entry.startTime, entry.endTime);
+                    row.innerHTML = `
+                        <td>${entry.startTime}</td>
+                        <td>${entry.endTime}</td>
+                        <td>${entry.status}</td>
+                        <td>${formatDuration(duration)}</td>
+                        <td>${entry.remarks}</td>
+                        <td>
+                            <button type="button" class="edit-log-btn rounded-md bg-blue-500 hover:bg-blue-600 text-white" data-index="${index}">Edit</button>
+                            <button type="button" class="delete-log-btn rounded-md" data-index="${index}">Delete</button>
+                        </td>
+                    `;
+                });
+            }
+
+            // Helper to calculate duration in minutes
+            function calculateDuration(startTime, endTime) {
+                const start = new Date(`2000/01/01 ${startTime}`);
+                let end = new Date(`2000/01/01 ${endTime}`);
+                // Handle overnight entries (end time is on the next day)
+                if (end < start) {
+                    end.setDate(end.getDate() + 1);
+                }
+                return (end - start) / (1000 * 60); // Duration in minutes
+            }
+
+            // Helper to format duration into Hh Mm
+            function formatDuration(minutes) {
+                if (minutes < 0) return "Invalid";
+                const hours = Math.floor(minutes / 60);
+                const remainingMinutes = Math.round(minutes % 60); // Round to nearest minute
+                return `${hours}h ${remainingMinutes}m`;
+            }
+
+            // Function to calculate and display daily summary
+            function calculateDailySummary() {
+                let totalDrivingMinutes = 0;
+                let totalOnDutyMinutes = 0; // Includes Driving and On-Duty Not Driving
+                let totalOffDutyMinutes = 0;
+                let totalSleeperMinutes = 0;
+
+                currentDayLogs.forEach(entry => {
+                    const duration = calculateDuration(entry.startTime, entry.endTime);
+                    if (duration < 0) return; // Skip invalid entries
+
+                    switch (entry.status) {
+                        case 'Driving':
+                            totalDrivingMinutes += duration;
+                            totalOnDutyMinutes += duration;
+                            break;
+                        case 'On-Duty Not Driving':
+                            totalOnDutyMinutes += duration;
+                            break;
+                        case 'Off-Duty':
+                            totalOffDutyMinutes += duration;
+                            break;
+                        case 'Sleeper Berth':
+                            totalSleeperMinutes += duration;
+                            break;
+                    }
+                });
+
+                dailyLogSummary.innerHTML = `
+                    <p><strong>Daily Driving:</strong> ${formatDuration(totalDrivingMinutes)}</p>
+                    <p><strong>Daily On-Duty:</strong> ${formatDuration(totalOnDutyMinutes)}</p>
+                    <p><strong>Daily Off-Duty:</strong> ${formatOffDutyTime(totalOffDutyMinutes)}</p>
+                    <p><strong>Daily Sleeper:</strong> ${formatDuration(totalSleeperMinutes)}</p>
+                `;
+            }
+
+            // Helper to format off-duty time, showing 10h if available
+            function formatOffDutyTime(minutes) {
+                if (minutes >= 10 * 60) {
+                    return `${formatDuration(minutes)} (10h break met)`;
+                }
+                return formatDuration(minutes);
+            }
+
+            // Function to add/edit a log entry
+            addLogEntryBtn.addEventListener('click', () => {
+                const startTime = startTimeInput.value;
+                const endTime = endTimeInput.value;
+                const dutyStatus = dutyStatusSelect.value;
+                const remarks = logRemarksInput.value.trim();
+
+                if (!startTime || !endTime || !dutyStatus) {
+                    errorMessageDiv.textContent = "Please fill in Start Time, End Time, and Duty Status.";
+                    return;
+                }
+                if (calculateDuration(startTime, endTime) <= 0) {
+                    errorMessageDiv.textContent = "End Time must be after Start Time.";
+                    return;
+                }
+
+                const newEntry = {
+                    startTime,
+                    endTime,
+                    status: dutyStatus,
+                    remarks
+                };
+
+                // Check if we are editing an existing entry
+                const editingIndex = addLogEntryBtn.dataset.editingIndex;
+                if (editingIndex !== undefined && editingIndex !== null && editingIndex !== "") {
+                    currentDayLogs[parseInt(editingIndex)] = newEntry;
+                    addLogEntryBtn.textContent = 'Add Log Entry'; // Change button back
+                    addLogEntryBtn.removeAttribute('data-editing-index');
+                } else {
+                    currentDayLogs.push(newEntry);
+                }
+
+                // Clear form
+                startTimeInput.value = '';
+                endTimeInput.value = '';
+                dutyStatusSelect.value = '';
+                logRemarksInput.value = '';
+
+                saveCurrentDayLogs(); // Save to Firestore
+            });
+
+            // Event listener for edit/delete buttons on the table body
+            logEntriesTableBody.addEventListener('click', (event) => {
+                const target = event.target;
+                const index = parseInt(target.dataset.index);
+
+                if (target.classList.contains('edit-log-btn')) {
+                    const entryToEdit = currentDayLogs[index];
+                    startTimeInput.value = entryToEdit.startTime;
+                    endTimeInput.value = entryToEdit.endTime;
+                    dutyStatusSelect.value = entryToEdit.status;
+                    logRemarksInput.value = entryToEdit.remarks;
+                    addLogEntryBtn.textContent = 'Save Changes'; // Change button text
+                    addLogEntryBtn.dataset.editingIndex = index; // Store index for saving
+                } else if (target.classList.contains('delete-log-btn')) {
+                    // Using a simple confirm for now, will replace with custom modal later
+                    if (window.confirm("Are you sure you want to delete this log entry?")) {
+                        currentDayLogs.splice(index, 1);
+                        saveCurrentDayLogs(); // Save updated array to Firestore
+                    }
+                }
+            });
+
+            // Event listener for date input change
+            logDateInput.addEventListener('change', loadLogsForSelectedDate);
+
+            // --- Linking Logs to Calculator HOS Logic ---
+            linkLogsToCalculatorCheckbox.addEventListener('change', () => {
+                const isLinked = linkLogsToCalculatorCheckbox.checked;
+                dailyDrivingLimitSelect.readOnly = isLinked;
+                current70HourClockInput.readOnly = isLinked;
+
+                // Visually disable select options if linked
+                Array.from(dailyDrivingLimitSelect.options).forEach(option => {
+                    option.disabled = isLinked;
+                });
+
+                if (isLinked) {
+                    updateHOSFromLogs(); // Call the function to update from logs
+                } else {
+                    // Revert to default/manual state if unlinked
+                    dailyDrivingLimitSelect.value = '11'; // Reset to default 11 hours
+                    current70HourClockInput.value = ''; // Clear or revert to user's last manual input
+                    // Re-enable options
+                    Array.from(dailyDrivingLimitSelect.options).forEach(option => {
+                        option.disabled = false;
+                    });
+                    calculateETA(); // Recalculate ETA based on manual input
+                }
+            });
+
+            // Function to calculate and update current HOS status from logs
+            async function updateHOSFromLogs() {
+                const userId = getFirebaseUserId();
+                if (!userId || !db || !getIsAuthReady()) {
+                    console.warn("User not authenticated or Firestore not ready. Cannot update HOS from logs.");
+                    // Set inputs to default or 0 if not authenticated/ready
+                    dailyDrivingLimitSelect.value = '11';
+                    current70HourClockInput.value = '0';
+                    calculateETA();
+                    return;
+                }
+
+                // Fetch logs for the last 8 days (70-hour lookback)
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Normalize today to midnight for consistent date comparison
+
+                const eightDaysAgo = new Date(today);
+                eightDaysAgo.setDate(today.getDate() - 7); // Start 7 days before today, covering 8 days total (today + 7 previous)
+
+                const allRelevantLogs = [];
+                const logSheetCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/log_sheets`);
+
+                // Fetch documents for the last 8 days
+                for (let i = 0; i < 8; i++) {
+                    const dateToFetch = new Date(eightDaysAgo);
+                    dateToFetch.setDate(eightDaysAgo.getDate() + i);
+                    const formattedDate = formatDateForFirestore(dateToFetch);
+                    const docRef = doc(logSheetCollectionRef, formattedDate);
+                    try {
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            const entries = JSON.parse(data.entries || '[]');
+                            entries.forEach(entry => {
+                                // Attach the full date-time to each entry for chronological processing
+                                const startDateTime = new Date(`${formattedDate}T${entry.startTime}`);
+                                let endDateTime = new Date(`${formattedDate}T${entry.endTime}`);
+                                if (endDateTime < startDateTime) { // Handle overnight entries
+                                    endDateTime.setDate(endDateTime.getDate() + 1);
+                                }
+                                allRelevantLogs.push({
+                                    ...entry,
+                                    startDateTime: startDateTime,
+                                    endDateTime: endDateTime,
+                                    durationMinutes: (endDateTime - startDateTime) / (1000 * 60)
+                                });
+                            });
+                        }
+                    } catch (e) {
+                        console.error(`Error fetching logs for ${formattedDate}:`, e);
+                    }
+                }
+
+                // Sort all entries chronologically
+                allRelevantLogs.sort((a, b) => a.startDateTime - b.startDateTime);
+
+                // --- HOS Rule Simulation ---
+                let current70HourClockMinutes = 0;
+                let currentDrivingHoursToday = 0;
+                let currentOnDutyHoursToday = 0;
+                let current14HourWindowEnd = null; // End time of the current 14-hour window
+                let last10HourBreakEnd = null; // Timestamp of the end of the last qualifying 10-hour break
+                let last34HourResetEnd = null; // Timestamp of the end of the last qualifying 34-hour reset
+
+                // Iterate through logs to simulate HOS from the start of the 8-day period
+                for (let i = 0; i < allRelevantLogs.length; i++) {
+                    const entry = allRelevantLogs[i];
+                    const duration = entry.durationMinutes;
+
+                    // If a 34-hour reset was completed *before or at the start* of this entry, reset 70-hour clock
+                    if (last34HourResetEnd && entry.startDateTime >= last34HourResetEnd) {
+                        current70HourClockMinutes = 0;
+                        last34HourResetEnd = null; // Consume the reset
+                    }
+
+                    // If a 10-hour break was completed *before or at the start* of this entry, reset daily clocks
+                    if (last10HourBreakEnd && entry.startDateTime >= last10HourBreakEnd) {
+                        currentDrivingHoursToday = 0;
+                        currentOnDutyHoursToday = 0;
+                        current14HourWindowEnd = null; // Reset 14-hour window
+                        last10HourBreakEnd = null; // Consume the break
+                    }
+
+                    // Update 70-hour clock
+                    if (entry.status === 'Driving' || entry.status === 'On-Duty Not Driving') {
+                        current70HourClockMinutes += duration;
+                    }
+
+                    // Check for 10-hour break and 34-hour reset completion
+                    if (entry.status === 'Off-Duty' || entry.status === 'Sleeper Berth') {
+                        if (duration >= (10 * 60)) { // 10-hour break
+                            last10HourBreakEnd = entry.endDateTime;
+                        }
+                        if (duration >= (34 * 60)) { // 34-hour reset
+                            last34HourResetEnd = entry.endDateTime;
+                        }
+                    }
+
+                    // Calculate daily driving and on-duty for the *current day* (today)
+                    // This is simplified. A real HOS system tracks this for *each* 24-hour period.
+                    // For now, we'll just sum for the actual calendar day.
+                    if (entry.endDateTime >= today) { // Check if the entry has any part in the current day
+                        const startOfToday = today.getTime();
+                        const segmentStart = Math.max(entry.startDateTime.getTime(), startOfToday);
+                        const segmentEnd = entry.endDateTime.getTime();
+                        const segmentDurationMinutes = (segmentEnd - segmentStart) / (1000 * 60);
+
+                        if (segmentDurationMinutes > 0) {
+                            if (entry.status === 'Driving') {
+                                currentDrivingHoursToday += segmentDurationMinutes / 60;
+                            }
+                            if (entry.status === 'Driving' || entry.status === 'On-Duty Not Driving') {
+                                currentOnDutyHoursToday += segmentDurationMinutes / 60;
+                            }
+                        }
+                    }
+                }
+
+                // Determine effective 70-hour clock remaining
+                let remaining70HourClock = Math.max(0, (70 * 60) - current70HourClockMinutes) / 60; // Convert back to hours
+
+                // Determine effective daily driving limit for the calculator
+                // This is still a simplified approach based on total driving today.
+                // A full HOS system would consider the 11-hour rule from the start of the current shift.
+                let effectiveDailyDrivingLimit = Math.max(0, 11 - currentDrivingHoursToday);
+                effectiveDailyDrivingLimit = Math.min(effectiveDailyDrivingLimit, Math.max(0, 14 - currentOnDutyHoursToday - 0.5)); // Also consider 14-hour rule (minus 0.5hr for break)
+
+                // Update the calculator inputs
+                // Ensure the dailyDrivingLimitSelect has an option for the calculated value
+                // If the calculated value is not a standard option, we'll set it as a custom option.
+                const calculatedDrivingLimit = effectiveDailyDrivingLimit.toFixed(2);
+                let optionExists = false;
+                for (let i = 0; i < dailyDrivingLimitSelect.options.length; i++) {
+                    if (dailyDrivingLimitSelect.options[i].value === calculatedDrivingLimit) {
+                        optionExists = true;
+                        break;
+                    }
+                }
+                if (!optionExists) {
+                    const newOption = document.createElement('option');
+                    newOption.value = calculatedDrivingLimit;
+                    newOption.textContent = `${calculatedDrivingLimit} Hours (from logs)`;
+                    dailyDrivingLimitSelect.appendChild(newOption);
+                }
+                dailyDrivingLimitSelect.value = calculatedDrivingLimit;
+                current70HourClockInput.value = remaining70HourClock.toFixed(2);
+
+                calculateETA(); // Recalculate ETA with the new HOS values
+            }
+
+
             // Function to add a new leg
             function addLeg() {
                 legCounter++; // This will make it Leg 2, Leg 3, etc.
@@ -615,9 +1291,11 @@
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
 
                 const avgSpeed = parseFloat(speedInput.value);
+                // Use the value from the select, which will be updated by logs if linked
                 const dailyDriveLimit = parseFloat(dailyDrivingLimitSelect.value);
-                let current70HrClock = parseFloat(current70HourClockInput.value); // Will be NaN if empty, handled below
-                let bufferPct = parseFloat(bufferPercentageInput.value); // Will be NaN if empty, handled below
+                // Use the value from the input, which will be updated by logs if linked
+                let current70HrClock = parseFloat(current70HourClockInput.value);
+                let bufferPct = parseFloat(bufferPercentageInput.value);
 
                 // Input validation for global fields
                 if (isNaN(avgSpeed) || avgSpeed <= 0) {
@@ -625,7 +1303,7 @@
                     return;
                 }
                 if (isNaN(dailyDriveLimit) || dailyDriveLimit <= 0) {
-                    errorMessageDiv.textContent = 'Please select a valid daily driving limit.';
+                    errorMessageDiv.textContent = 'Please select a valid daily driving limit or ensure logs provide a valid value.';
                     return;
                 }
                 if (!currentTZSelect.value) {
@@ -796,7 +1474,7 @@
                     if (consider70HourClockCheckbox.checked) {
                         const num70HourBlocks = Math.floor(currentCumulativeOnDutyTimeFor70Clock / 70);
                         if (num70HourBlocks > 0) {
-                            returnLegHoursAddedToTotalTrip += num70HourBlocks * 34;
+                            legHoursAddedToTotalTrip += num70HourBlocks * 34;
                             currentCumulativeOnDutyTimeFor70Clock -= (num70HourBlocks * 70);
                         }
                     }
@@ -852,6 +1530,14 @@
                 include10HourOffDutyCheckbox.checked = false;
                 consider70HourClockCheckbox.checked = false;
                 enableRoundTripCheckbox.checked = false; // Reset Round Trip checkbox
+                linkLogsToCalculatorCheckbox.checked = false; // Reset log linking checkbox
+                dailyDrivingLimitSelect.readOnly = false; // Make editable again
+                current70HourClockInput.readOnly = false; // Make 70-hour input editable again
+                // Re-enable options for dailyDrivingLimitSelect
+                Array.from(dailyDrivingLimitSelect.options).forEach(option => {
+                    option.disabled = false;
+                });
+
                 resultDiv.textContent = 'Your estimated arrival time will appear here.';
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
                 errorMessageDiv.textContent = '';
@@ -860,11 +1546,23 @@
                 legsContainer.innerHTML = '';
                 legCounter = 1; // Reset leg counter for next additions
 
-                // Hide advanced and chaining options by default on reset
+                // Clear log sheet form and data
+                startTimeInput.value = '';
+                endTimeInput.value = '';
+                dutyStatusSelect.value = '';
+                logRemarksInput.value = '';
+                currentDayLogs = [];
+                renderLogEntries();
+                calculateDailySummary();
+                logDateInput.value = formatDateForFirestore(new Date()); // Reset log date to today
+
+                // Hide all collapsible sections by default on reset
                 advancedOptionsDiv.classList.add('hidden');
                 toggleAdvancedBtn.textContent = 'Show Advanced HOS Options';
                 chainingOptionsDiv.classList.add('hidden');
                 toggleChainingBtn.textContent = 'Show Destination Chaining Options';
+                logSheetSection.classList.add('hidden');
+                toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
 
                 calculateETA(); // Recalculate after reset
             }
@@ -873,7 +1571,7 @@
             // Event Listeners for global inputs (Leg 1)
             milesInput.addEventListener('input', calculateETA);
             speedInput.addEventListener('input', calculateETA);
-            dailyDrivingLimitSelect.addEventListener('change', calculateETA);
+            dailyDrivingLimitSelect.addEventListener('change', calculateETA); // Still listen for manual changes if not linked
             currentTZSelect.addEventListener('change', calculateETA);
             destinationTZInput.addEventListener('change', calculateETA); // For Leg 1
 
@@ -900,6 +1598,18 @@
                 calculateETA(); // Recalculate when visibility changes
             });
 
+            toggleLogSheetBtn.addEventListener('click', () => {
+                logSheetSection.classList.toggle('hidden');
+                logSheetSection.classList.toggle('block');
+                if (logSheetSection.classList.contains('block')) {
+                    toggleLogSheetBtn.textContent = 'Hide Log Sheet Tracker';
+                    loadLogsForSelectedDate(); // Load logs when section is opened
+                } else {
+                    toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
+                }
+                // No ETA recalculation needed just for showing/hiding log sheet
+            });
+
             // Event Listeners for dynamic leg management
             addLegBtn.addEventListener('click', addLeg);
             legsContainer.addEventListener('click', (event) => {
@@ -912,9 +1622,14 @@
             apply14HourRuleCheckbox.addEventListener('change', calculateETA);
             include10HourOffDutyCheckbox.addEventListener('change', calculateETA);
             consider70HourClockCheckbox.addEventListener('change', calculateETA);
-            current70HourClockInput.addEventListener('input', calculateETA);
+            current70HourClockInput.addEventListener('input', () => {
+                // Only trigger ETA if not linked, otherwise updateHOSFromLogs handles it
+                if (!linkLogsToCalculatorCheckbox.checked) {
+                    calculateETA();
+                }
+            });
             bufferPercentageInput.addEventListener('input', calculateETA);
-            enableRoundTripCheckbox.addEventListener('change', calculateETA); // New event listener for round trip checkbox
+            enableRoundTripCheckbox.addEventListener('change', calculateETA);
 
             // --- Branding Static Image Setup ---
             // Instructions for user:
@@ -947,6 +1662,10 @@
 
             // Initial calculation when page loads
             calculateETA();
+
+            // Load logs for the current date after Firebase authentication is ready
+            // The onAuthStateChanged listener at the top of the script will call loadLogsForSelectedDate()
+            // once authentication is complete.
         });
     </script>
 </body>
