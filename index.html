@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trucker ETA Calculator</title>
+    <title>TruckerPro ETA Calculator</title>
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, onSnapshot, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, onSnapshot, deleteDoc, getDocs, where, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Your web app's Firebase configuration - EMBEDDED HERE
         const firebaseConfig = {
             apiKey: "AIzaSyA8_guHEaQwhFaSziqPMQIKVHdk4A0LSPA",
             authDomain: "truckerpro-15e99.firebaseapp.com",
             projectId: "truckerpro-15e99",
-            storageBucket: "truckerpro-15e99.firebasestorage.app",
+            storageBucket: "truckerpro-15e99.firebaseapp.com",
             messagingSenderId: "44586799726",
             appId: "1:44586799726:web:e32b82837133b128dc8c7f",
             measurementId: "G-8NK9D8H849"
@@ -34,6 +34,12 @@
         let userId = null; // Will store the authenticated user's ID
         let isAuthReady = false; // Flag to indicate if authentication is complete
 
+        // IMPORTANT: Replace 'YOUR_ADMIN_FIREBASE_UID_HERE' with your actual Firebase User ID (UID).
+        // You can find your UID by inspecting the console after signing in anonymously to your deployed app,
+        // or by checking the Firebase Authentication section in your project.
+        // Example: const ADMIN_UID = 'someLongRandomStringFromFirebase';
+        const ADMIN_UID = 'YOUR_ADMIN_FIREBASE_UID_HERE'; // <--- REPLACE THIS WITH YOUR ACTUAL UID FOR ADMIN ACCESS
+
         // Authenticate user and set up auth state listener
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -46,13 +52,16 @@
                 if (document.getElementById('linkLogsToCalculator').checked) {
                     updateHOSFromLogs();
                 }
+                // Start listening for comments once authenticated
+                listenForComments(); // This will now also load hidden comments
             } else {
                 // Sign in anonymously if no user is authenticated
                 try {
                     await signInAnonymously(auth);
+                    // After anonymous sign-in, userId will be set by the onAuthStateChanged listener
                 } catch (error) {
                     console.error("Firebase authentication error:", error);
-                    document.getElementById('errorMessage').textContent = "Authentication failed. Log sheet features may not work.";
+                    document.getElementById('errorMessage').textContent = "Authentication failed. Log sheet and comment features may not work.";
                 }
             }
         });
@@ -64,6 +73,7 @@
         window.getFirebaseUserId = () => userId; // Function to get userId
         window.getIsAuthReady = () => isAuthReady; // Function to check auth readiness
         window.appId = appId; // Make appId available globally for Firestore paths
+        window.getAdminUID = () => ADMIN_UID; // Make ADMIN_UID accessible for comment deletion logic
     </script>
     <!-- PayPal SDK Script (Code 1) -->
     <script
@@ -92,12 +102,22 @@
             text-align: center;
             border: 1px solid #e2e8f0; /* Subtle border */
         }
-        .title {
-            color: #2c3e50; /* Darker title color */
-            font-size: 2.25rem; /* Larger title */
-            font-weight: 700;
+        .title-group {
             margin-bottom: 1.75rem;
-            letter-spacing: -0.025em; /* Slightly tighter letter spacing */
+        }
+        .main-title {
+            color: #2c3e50; /* Darker title color */
+            font-size: 2.75rem; /* Larger title */
+            font-weight: 800; /* Extra bold */
+            margin-bottom: 0.25rem; /* Small space between titles */
+            letter-spacing: -0.05em; /* Tighter letter spacing */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        .sub-title {
+            color: #607d8b; /* Muted gray for subtitle */
+            font-size: 1.5rem; /* Subdued size */
+            font-weight: 500; /* Medium weight */
+            margin-top: 0;
         }
         .input-group {
             margin-bottom: 1.25rem;
@@ -132,7 +152,7 @@
             cursor: not-allowed;
             border-color: #ced4da;
         }
-        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn, #updateLocationBtn { /* Added new buttons, including updateLocationBtn */
+        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn, #updateLocationBtn, #showCommentsBtn, #submitCommentBtn, .hide-comment-btn { /* Added new buttons, including updateLocationBtn */
             background-image: linear-gradient(to right, #4299e1, #3182ce); /* Gradient button */
             color: white;
             padding: 0.85rem 1.75rem;
@@ -146,12 +166,12 @@
             width: 100%; /* Full width button */
             margin-top: 1rem; /* Space between buttons */
         }
-        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover, #updateLocationBtn:hover { /* Added new buttons */
+        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover, #updateLocationBtn:hover, #showCommentsBtn:hover, #submitCommentBtn:hover, .hide-comment-btn:hover { /* Added new buttons */
             background-image: linear-gradient(to right, #3182ce, #2b6cb0);
             box-shadow: 0 6px 15px rgba(66, 153, 225, 0.4);
             transform: translateY(-2px); /* Slight lift effect */
         }
-        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active, #updateLocationBtn:active { /* Added new buttons */
+        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active, #updateLocationBtn:active, #showCommentsBtn:active, #submitCommentBtn:active, .hide-comment-btn:active { /* Added new buttons */
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 153, 225, 0.2);
         }
@@ -238,7 +258,7 @@
             font-size: 0.8rem; /* Slightly smaller for tips */
             color: #718096;
         }
-        .advanced-input-group, .leg-input-group, .log-input-group { /* For buffer percentage, 70-hour input, and leg inputs */
+        .advanced-input-group, .leg-input-group, .log-input-group {
             margin-top: 1rem;
             margin-bottom: 1.25rem;
             text-align: left;
@@ -520,6 +540,150 @@
                 padding: 0.5rem 0.75rem;
             }
         }
+
+        /* Comment Modal Styles */
+        .comment-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Ensure it's on top of everything */
+        }
+
+        .comment-modal-content {
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 90%; /* Responsive width */
+            position: relative;
+            max-height: 80vh; /* Max height for scrollability */
+            overflow-y: auto; /* Enable scrolling for content */
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .comment-modal-content h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        .comment-modal-content textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #cbd5e0;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            min-height: 80px;
+            resize: vertical; /* Allow vertical resizing */
+        }
+
+        .comment-modal-content .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #718096;
+            transition: color 0.2s ease;
+        }
+
+        .comment-modal-content .close-button:hover {
+            color: #e53e3e;
+        }
+
+        .comments-display-area {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 1rem;
+            margin-top: 1rem;
+            max-height: 300px; /* Max height for comment list */
+            overflow-y: auto; /* Scroll for comments */
+        }
+
+        .comment-entry {
+            background-color: #f8fafc;
+            border: 1px solid #edf2f7;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* For delete button positioning */
+        }
+
+        .comment-entry:last-child {
+            margin-bottom: 0;
+        }
+
+        .comment-entry strong {
+            color: #3182ce;
+            font-size: 0.9rem;
+            display: block;
+            margin-bottom: 0.25rem;
+            word-break: break-all; /* Ensure long IDs wrap */
+        }
+
+        .comment-entry .timestamp {
+            font-size: 0.75rem;
+            color: #718096;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .comment-entry p {
+            font-size: 0.9rem;
+            color: #4a5568;
+            line-height: 1.4;
+        }
+
+        .comment-entry .delete-comment-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.25rem 0.5rem; /* px-2 py-1 */
+            font-size: 0.75rem; /* text-xs */
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .comment-entry .delete-comment-btn:hover {
+            background-color: #c53030;
+        }
+
+        .comment-entry .hide-comment-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 4.5rem; /* Positioned next to delete button */
+            background-color: #607d8b; /* Gray color */
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .comment-entry .hide-comment-btn:hover {
+            background-color: #455a64;
+        }
     </style>
 </head>
 <body>
@@ -527,7 +691,10 @@
         <div class="logo-container">
             <img id="truckLogo" src="YOUR_TRUCK_LOGO_IMAGE_URL_HERE" alt="Trucker ETA Logo">
         </div>
-        <h1 class="title">Trucker ETA Calculator</h1>
+        <div class="title-group">
+            <h1 class="main-title">TruckerPro</h1>
+            <h2 class="sub-title">ETA Calculator</h2>
+        </div>
 
         <div class="input-group">
             <label for="miles">Total Miles (Leg 1):</label>
@@ -547,7 +714,7 @@
                 <option value="10">10 Hours</option>
                 <option value="11" selected>11 Hours (Standard HOS Max)</option>
             </select>
-            <p class="tip">This is your estimated maximum driving time per day. The calculator includes a 1-hour daily break (covering pre-trip, post-trip, and 30-min driving break).</p>
+            <p class="tip">This is your estimated maximum driving time per day.</p>
         </div>
 
         <div class="input-group">
@@ -558,6 +725,14 @@
             <p class="tip">Your device's time zone is pre-selected if possible. This is the starting time zone for your entire trip.</p>
         </div>
 
+        <div class="input-group">
+            <label for="destinationTZ">Destination Time Zone (Leg 1):</label>
+            <select id="destinationTZ" class="rounded-xl">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <p class="tip">This is the time zone for your first destination.</p>
+        </div>
+
         <button id="updateLocationBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
             Update Current Location (GPS)
         </button>
@@ -566,14 +741,6 @@
             This button provides your current Latitude and Longitude. It does not influence the calculator's logic and your location data is not stored or shared.
         </p>
 
-
-        <div class="input-group">
-            <label for="destinationTZ">Destination Time Zone (Leg 1):</label>
-            <select id="destinationTZ" class="rounded-xl">
-                <!-- Options will be populated by JavaScript -->
-            </select>
-            <p class="tip">This is the time zone for your first destination.</p>
-        </div>
 
         <button id="calculateBtn" class="rounded-xl">Calculate ETA</button>
         <button id="resetBtn" class="rounded-xl">Reset Calculator</button>
@@ -588,6 +755,16 @@
 
         <div id="advancedOptions" class="hidden">
             <h2>Advanced HOS Considerations</h2>
+            <div class="input-group">
+                <label for="plannedDailyBreakTotal">Planned Daily Break (Total Hours):</label>
+                <input type="number" id="plannedDailyBreakTotal" value="1" step="0.1" placeholder="e.g., 1.0" class="rounded-xl">
+                <p class="tip">Total hours planned for daily breaks (e.g., pre-trip, post-trip, 30-min driving break, fueling, etc.). Default is 1 hour.</p>
+            </div>
+            <div class="input-group">
+                <label for="onDutyPortionOfDailyBreak">On-Duty Portion of Daily Break (Hours):</label>
+                <input type="number" id="onDutyPortionOfDailyBreak" value="0.5" step="0.1" placeholder="e.g., 0.5" class="rounded-xl">
+                <p class="tip">Portion of your daily break that counts as "on-duty, non-driving" time (e.g., pre-trip, post-trip inspections). Default is 0.5 hours.</p>
+            </div>
             <div class="checkbox-group">
                 <input type="checkbox" id="apply14HourRule">
                 <label for="apply14HourRule">Extend to 14-Hour On-Duty Window</label>
@@ -649,7 +826,9 @@
             <div class="checkbox-group">
                 <input type="checkbox" id="linkLogsToCalculator">
                 <label for="linkLogsToCalculator">Link Logs to ETA Calculator</label>
-                <p class="tip">If checked, the "Current 70-Hour Clock Hours" and "Estimated Daily Driving Limit" in the Advanced HOS Options will automatically update based on your log entries. Otherwise, they will remain manual.</p>
+                <p class="tip">
+                    If checked, the "Estimated Daily Driving Limit" (in the main calculator) and "Current 70-Hour Clock Hours" (in Advanced HOS Options) will automatically update based on your log entries. Otherwise, they will remain manual.
+                </p>
             </div>
 
             <div class="log-form">
@@ -715,6 +894,9 @@
             <p>Authored by Mark Bird</p>
             <a id="githubLink" href="https://github.com/cyraunyielding" target="_blank" rel="noopener noreferrer">Visit my GitHub</a>
             <a id="issuesLink" href="https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues" target="_blank" rel="noopener noreferrer">Report Issues or Suggestions</a>
+            <button id="showCommentsBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+                The Comments Section
+            </button>
             <p class="text-sm mt-2">
                 *HOS Disclaimer: The calculator’s HOS logic is a practical simulation, not a full regulatory compliance tool.
             </p>
@@ -731,6 +913,19 @@
         </div>
     </div>
 
+    <!-- Comment Modal Structure -->
+    <div id="commentModal" class="comment-modal-overlay hidden">
+        <div class="comment-modal-content">
+            <button class="close-button" id="closeCommentModalBtn">&times;</button>
+            <h2>Comments & Feedback</h2>
+            <textarea id="commentInput" rows="4" placeholder="Share your thoughts or suggestions here..." class="rounded-xl"></textarea>
+            <button id="submitCommentBtn" class="rounded-xl">Submit Comment</button>
+            <div class="comments-display-area" id="commentsDisplayArea">
+                <p class="text-center text-gray-500">Loading comments...</p>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Ensure Firebase instances are available globally (from the module script in head)
         let db;
@@ -738,6 +933,7 @@
         let getFirebaseUserId;
         let getIsAuthReady; // New function to check auth readiness
         let appId; // Global appId
+        let getAdminUID; // Function to get ADMIN_UID
 
         // Wait for the DOM to be fully loaded and Firebase to be initialized
         document.addEventListener('DOMContentLoaded', async () => {
@@ -747,6 +943,7 @@
             getFirebaseUserId = window.getFirebaseUserId;
             getIsAuthReady = window.getIsAuthReady;
             appId = window.appId; // This will now be 'trucker-eta-calculator-app'
+            getAdminUID = window.getAdminUID; // Get the ADMIN_UID function
 
             // Global inputs (now representing Leg 1)
             const milesInput = document.getElementById('miles'); // Now for Leg 1
@@ -767,6 +964,8 @@
             const logSheetSection = document.getElementById('logSheetSection'); // New log sheet section
 
             // Advanced HOS options
+            const plannedDailyBreakTotalInput = document.getElementById('plannedDailyBreakTotal'); // New
+            const onDutyPortionOfDailyBreakInput = document.getElementById('onDutyPortionOfDailyBreak'); // New
             const apply14HourRuleCheckbox = document.getElementById('apply14HourRule');
             const include10HourOffDutyCheckbox = document.getElementById('include10HourOffDuty');
             const consider70HourClockCheckbox = document.getElementById('consider70HourClock');
@@ -795,6 +994,14 @@
             const addLogEntryBtn = document.getElementById('addLogEntryBtn');
             const logEntriesTableBody = document.getElementById('logEntriesTableBody');
             const dailyLogSummary = document.getElementById('dailyLogSummary');
+
+            // Comment Modal elements
+            const showCommentsBtn = document.getElementById('showCommentsBtn');
+            const commentModal = document.getElementById('commentModal');
+            const closeCommentModalBtn = document.getElementById('closeCommentModalBtn');
+            const commentInput = document.getElementById('commentInput');
+            const submitCommentBtn = document.getElementById('submitCommentBtn');
+            const commentsDisplayArea = document.getElementById('commentsDisplayArea');
 
             // Branding elements
             const truckLogo = document.getElementById('truckLogo');
@@ -869,6 +1076,140 @@
 
             // Set log date to today by default
             logDateInput.value = formatDateForFirestore(new Date());
+
+            // --- Local Storage Persistence Functions ---
+            function saveCalculatorState() {
+                const state = {
+                    miles: milesInput.value,
+                    speed: speedInput.value,
+                    dailyDrivingLimit: dailyDrivingLimitSelect.value,
+                    currentTZ: currentTZSelect.value,
+                    destinationTZ: destinationTZInput.value,
+                    plannedDailyBreakTotal: plannedDailyBreakTotalInput.value, // Save new inputs
+                    onDutyPortionOfDailyBreak: onDutyPortionOfDailyBreakInput.value, // Save new inputs
+                    apply14HourRule: apply14HourRuleCheckbox.checked,
+                    include10HourOffDuty: include10HourOffDutyCheckbox.checked,
+                    consider70HourClock: consider70HourClockCheckbox.checked,
+                    current70HourClock: current70HourClockInput.value, // Save manual value
+                    bufferPercentage: bufferPercentageInput.value,
+                    enableRoundTrip: enableRoundTripCheckbox.checked,
+                    linkLogsToCalculator: linkLogsToCalculatorCheckbox.checked,
+                    legs: [], // Store dynamic legs
+                    // Store visibility states of collapsible sections
+                    advancedOptionsVisible: !advancedOptionsDiv.classList.contains('hidden'),
+                    chainingOptionsVisible: !chainingOptionsDiv.classList.contains('hidden'),
+                    logSheetVisible: !logSheetSection.classList.contains('hidden')
+                };
+
+                // Save dynamic legs
+                const dynamicLegSections = legsContainer.querySelectorAll('.leg-section');
+                dynamicLegSections.forEach((legElement, index) => {
+                    const legNumber = index + 2;
+                    state.legs.push({
+                        miles: legElement.querySelector(`#miles-${legNumber}`).value,
+                        destTZ: legElement.querySelector(`#destinationTZ-${legNumber}`).value
+                    });
+                });
+
+                localStorage.setItem('truckerCalculatorState', JSON.stringify(state));
+                console.log("Calculator state saved to local storage.");
+            }
+
+            function loadCalculatorState() {
+                const savedState = localStorage.getItem('truckerCalculatorState');
+                if (savedState) {
+                    const state = JSON.parse(savedState);
+
+                    milesInput.value = state.miles || '';
+                    speedInput.value = state.speed || '';
+                    // Handle dailyDrivingLimit separately to ensure option exists
+                    if (state.dailyDrivingLimit) {
+                        let optionExists = false;
+                        for (let i = 0; i < dailyDrivingLimitSelect.options.length; i++) {
+                            if (dailyDrivingLimitSelect.options[i].value === state.dailyDrivingLimit) {
+                                optionExists = true;
+                                break;
+                            }
+                        }
+                        if (!optionExists) {
+                            const newOption = document.createElement('option');
+                            newOption.value = state.dailyDrivingLimit;
+                            newOption.textContent = `${state.dailyDrivingLimit} Hours (saved)`;
+                            dailyDrivingLimitSelect.appendChild(newOption);
+                        }
+                        dailyDrivingLimitSelect.value = state.dailyDrivingLimit;
+                    } else {
+                        dailyDrivingLimitSelect.value = '11';
+                    }
+
+                    currentTZSelect.value = state.currentTZ || '';
+                    destinationTZInput.value = state.destinationTZ || '';
+                    plannedDailyBreakTotalInput.value = state.plannedDailyBreakTotal !== undefined ? state.plannedDailyBreakTotal : '1'; // Load new inputs
+                    onDutyPortionOfDailyBreakInput.value = state.onDutyPortionOfDailyBreak !== undefined ? state.onDutyPortionOfDailyBreak : '0.5'; // Load new inputs
+                    apply14HourRuleCheckbox.checked = state.apply14HourRule || false;
+                    include10HourOffDutyCheckbox.checked = state.include10HourOffDuty || false;
+                    consider70HourClockCheckbox.checked = state.consider70HourClock || false;
+                    current70HourClockInput.value = state.current70HourClock || '';
+                    bufferPercentageInput.value = state.bufferPercentage || '';
+                    enableRoundTripCheckbox.checked = state.enableRoundTrip || false;
+                    linkLogsToCalculatorCheckbox.checked = state.linkLogsToCalculator || false;
+
+                    // Re-populate time zones after setting values to ensure options exist
+                    populateTimeZones(currentTZSelect);
+                    populateTimeZones(destinationTZInput);
+
+                    // Load dynamic legs
+                    legsContainer.innerHTML = ''; // Clear existing dynamic legs
+                    legCounter = 1; // Reset counter
+                    if (state.legs && state.legs.length > 0) {
+                        state.legs.forEach(legData => {
+                            addLeg(legData.miles, legData.destTZ); // Pass saved data to addLeg
+                        });
+                    }
+
+                    // Restore visibility of collapsible sections
+                    if (state.advancedOptionsVisible) {
+                        advancedOptionsDiv.classList.remove('hidden');
+                        advancedOptionsDiv.classList.add('block');
+                        toggleAdvancedBtn.textContent = 'Hide Advanced HOS Options';
+                    } else {
+                        advancedOptionsDiv.classList.add('hidden');
+                        advancedOptionsDiv.classList.remove('block');
+                        toggleAdvancedBtn.textContent = 'Show Advanced HOS Options';
+                    }
+                    if (state.chainingOptionsVisible) {
+                        chainingOptionsDiv.classList.remove('hidden');
+                        chainingOptionsDiv.classList.add('block');
+                        toggleChainingBtn.textContent = 'Hide Destination Chaining Options';
+                    } else {
+                        chainingOptionsDiv.classList.add('hidden');
+                        chainingOptionsDiv.classList.remove('block');
+                        toggleChainingBtn.textContent = 'Show Destination Chaining Options';
+                    }
+                    if (state.logSheetVisible) {
+                        logSheetSection.classList.remove('hidden');
+                        logSheetSection.classList.add('block');
+                        toggleLogSheetBtn.textContent = 'Hide Log Sheet Tracker';
+                    } else {
+                        logSheetSection.classList.add('hidden');
+                        logSheetSection.classList.remove('block');
+                        toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
+                    }
+
+                    // Apply linked state immediately after loading
+                    const isLinked = linkLogsToCalculatorCheckbox.checked;
+                    dailyDrivingLimitSelect.disabled = isLinked;
+                    dailyDrivingLimitSelect.readOnly = isLinked;
+                    current70HourClockInput.disabled = isLinked;
+                    current70HourClockInput.readOnly = isLinked;
+                    Array.from(dailyDrivingLimitSelect.options).forEach(option => {
+                        option.disabled = isLinked;
+                    });
+
+
+                    console.log("Calculator state loaded from local storage.");
+                }
+            }
 
             // --- Geolocation Functionality ---
             updateLocationBtn.addEventListener('click', () => {
@@ -1161,7 +1502,9 @@
             // --- Linking Logs to Calculator HOS Logic ---
             linkLogsToCalculatorCheckbox.addEventListener('change', () => {
                 const isLinked = linkLogsToCalculatorCheckbox.checked;
+                dailyDrivingLimitSelect.disabled = isLinked; // Disable for user input
                 dailyDrivingLimitSelect.readOnly = isLinked;
+                current70HourClockInput.disabled = isLinked; // Disable for user input
                 current70HourClockInput.readOnly = isLinked;
 
                 // Visually disable select options if linked
@@ -1173,14 +1516,19 @@
                     updateHOSFromLogs(); // Call the function to update from logs
                 } else {
                     // Revert to default/manual state if unlinked
-                    dailyDrivingLimitSelect.value = '11'; // Reset to default 11 hours
-                    current70HourClockInput.value = ''; // Clear or revert to user's last manual input
-                    // Re-enable options
+                    // Load from local storage or set to default if no local storage
+                    loadCalculatorState(); // Re-load all state, which will restore manual values
+                    // Ensure the dailyDrivingLimitSelect is re-enabled and its options are too
+                    dailyDrivingLimitSelect.disabled = false;
+                    dailyDrivingLimitSelect.readOnly = false;
+                    current70HourClockInput.disabled = false;
+                    current70HourClockInput.readOnly = false;
                     Array.from(dailyDrivingLimitSelect.options).forEach(option => {
                         option.disabled = false;
                     });
                     calculateETA(); // Recalculate ETA based on manual input
                 }
+                saveCalculatorState(); // Save the state of the checkbox
             });
 
             // Function to calculate and update current HOS status from logs
@@ -1308,7 +1656,7 @@
                 // This is still a simplified approach based on total driving today.
                 // A full HOS system would consider the 11-hour rule from the start of the current shift.
                 let effectiveDailyDrivingLimit = Math.max(0, 11 - currentDrivingHoursToday);
-                effectiveDailyDrivingLimit = Math.min(effectiveDailyDrivingLimit, Math.max(0, 14 - currentOnDutyHoursToday - 0.5)); // Also consider 14-hour rule (minus 0.5hr for break)
+                effectiveDailyDrivingLimit = Math.min(effectiveDailyDrivingLimit, Math.max(0, 14 - currentOnDutyHoursToday - (parseFloat(onDutyPortionOfDailyBreakInput.value) || 0.5))); // Also consider 14-hour rule (minus on-duty break)
 
                 // Update the calculator inputs
                 // Ensure the dailyDrivingLimitSelect has an option for the calculated value
@@ -1335,7 +1683,7 @@
 
 
             // Function to add a new leg
-            function addLeg() {
+            function addLeg(miles = '', destTZ = '') { // Added parameters for loading from local storage
                 legCounter++; // This will make it Leg 2, Leg 3, etc.
                 const newLegHtml = `
                     <div class="leg-section" id="leg-${legCounter}">
@@ -1343,7 +1691,7 @@
                         <button type="button" class="remove-leg-btn rounded-xl" data-leg-id="${legCounter}">Remove</button>
                         <div class="leg-input-group">
                             <label for="miles-${legCounter}">Miles for Leg ${legCounter}:</label>
-                            <input type="number" id="miles-${legCounter}" placeholder="e.g., 500" class="rounded-xl">
+                            <input type="number" id="miles-${legCounter}" placeholder="e.g., 500" class="rounded-xl" value="${miles}">
                         </div>
                         <div class="leg-input-group">
                             <label for="destinationTZ-${legCounter}">Destination Time Zone for Leg ${legCounter}:</label>
@@ -1358,13 +1706,20 @@
                 // Populate time zones for the new leg's destination
                 const newDestinationTZSelect = document.getElementById(`destinationTZ-${legCounter}`);
                 populateTimeZones(newDestinationTZSelect);
+                if (destTZ) {
+                    newDestinationTZSelect.value = destTZ;
+                }
 
-                // Add event listeners to new inputs for recalculation
-                document.getElementById(`miles-${legCounter}`).addEventListener('input', calculateETA);
-                newDestinationTZSelect.addEventListener('change', calculateETA);
+                // Add event listeners to new inputs for recalculation and saving state
+                document.getElementById(`miles-${legCounter}`).addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
+                newDestinationTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
                 document.querySelector(`#leg-${legCounter} .remove-leg-btn`).addEventListener('click', removeLeg);
 
-                calculateETA(); // Recalculate after adding a leg
+                // Only calculate ETA and save state if not loading from local storage initially
+                if (miles === '' && destTZ === '') {
+                    calculateETA(); // Recalculate after adding a leg manually
+                    saveCalculatorState();
+                }
             }
 
             // Function to remove a leg
@@ -1376,6 +1731,7 @@
                     // No need to decrement legCounter or re-index IDs for now,
                     // as we iterate through existing sections.
                     calculateETA();
+                    saveCalculatorState(); // Save state after removing a leg
                 }
             }
 
@@ -1391,6 +1747,11 @@
                 // Use the value from the input, which will be updated by logs if linked
                 let current70HrClock = parseFloat(current70HourClockInput.value);
                 let bufferPct = parseFloat(bufferPercentageInput.value);
+
+                // New granular break inputs
+                const plannedDailyBreakTotal = parseFloat(plannedDailyBreakTotalInput.value) || 1; // Default to 1 if invalid
+                const onDutyPortionOfDailyBreak = parseFloat(onDutyPortionOfDailyBreakInput.value) || 0.5; // Default to 0.5 if invalid
+
 
                 // Input validation for global fields
                 if (isNaN(avgSpeed) || avgSpeed <= 0) {
@@ -1412,14 +1773,24 @@
                 if (isNaN(bufferPct) || bufferPct < 0) {
                     bufferPct = 0;
                 }
+                if (isNaN(plannedDailyBreakTotal) || plannedDailyBreakTotal < 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid non-negative number for Planned Daily Break.';
+                    return;
+                }
+                if (isNaN(onDutyPortionOfDailyBreak) || onDutyPortionOfDailyBreak < 0 || onDutyPortionOfDailyBreak > plannedDailyBreakTotal) {
+                    errorMessageDiv.textContent = 'Please enter a valid non-negative number for On-Duty Portion of Daily Break (must be less than or equal to total break).';
+                    return;
+                }
+
 
                 let totalTripHours = 0;
                 let cumulativeOnDutyTimeFor70Clock = current70HrClock;
                 let currentLegOriginTZ = currentTZSelect.value; // Origin for the first leg
 
-                const dailyBreakTotal = 1; // 0.5 on-duty, 0.5 off-duty
-                const dailyBreakOnDutyPortion = 0.5;
-                const dailyBreakOffDutyPortion = 0.5;
+                // Use new granular break values
+                const dailyBreakTotal = plannedDailyBreakTotal;
+                const dailyBreakOnDutyPortion = onDutyPortionOfDailyBreak;
+                const dailyBreakOffDutyPortion = dailyBreakTotal - dailyBreakOnDutyPortion;
 
                 const allLegsData = [];
                 let totalForwardMiles = 0; // To sum up miles for round trip
@@ -1619,6 +1990,8 @@
                 dailyDrivingLimitSelect.value = '11'; // Reset to default 11 hours
                 populateTimeZones(currentTZSelect); // Re-populate current time zone
                 populateTimeZones(destinationTZInput); // Re-populate Leg 1 destination TZ
+                plannedDailyBreakTotalInput.value = '1'; // Reset new inputs
+                onDutyPortionOfDailyBreakInput.value = '0.5'; // Reset new inputs
                 current70HourClockInput.value = ''; // Clear to show placeholder
                 bufferPercentageInput.value = ''; // Clear to show placeholder
                 apply14HourRuleCheckbox.checked = false;
@@ -1626,8 +1999,10 @@
                 consider70HourClockCheckbox.checked = false;
                 enableRoundTripCheckbox.checked = false; // Reset Round Trip checkbox
                 linkLogsToCalculatorCheckbox.checked = false; // Reset log linking checkbox
-                dailyDrivingLimitSelect.readOnly = false; // Make editable again
-                current70HourClockInput.readOnly = false; // Make 70-hour input editable again
+                dailyDrivingLimitSelect.disabled = false; // Make editable again
+                dailyDrivingLimitSelect.readOnly = false;
+                current70HourClockInput.disabled = false; // Make 70-hour input editable again
+                current70HourClockInput.readOnly = false;
                 // Re-enable options for dailyDrivingLimitSelect
                 Array.from(dailyDrivingLimitSelect.options).forEach(option => {
                     option.disabled = false;
@@ -1660,16 +2035,21 @@
                 logSheetSection.classList.add('hidden');
                 toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
 
+                saveCalculatorState(); // Save the reset state
                 calculateETA(); // Recalculate after reset
             }
 
 
             // Event Listeners for global inputs (Leg 1)
-            milesInput.addEventListener('input', calculateETA);
-            speedInput.addEventListener('input', calculateETA);
-            dailyDrivingLimitSelect.addEventListener('change', calculateETA); // Still listen for manual changes if not linked
-            currentTZSelect.addEventListener('change', calculateETA);
-            destinationTZInput.addEventListener('change', calculateETA); // For Leg 1
+            milesInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
+            speedInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
+            dailyDrivingLimitSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // Still listen for manual changes if not linked
+            currentTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
+            destinationTZInput.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // For Leg 1
+
+            // Event Listeners for new granular break inputs
+            plannedDailyBreakTotalInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
+            onDutyPortionOfDailyBreakInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
 
             // Event Listeners for buttons
             calculateBtn.addEventListener('click', calculateETA);
@@ -1679,8 +2059,14 @@
             toggleAdvancedBtn.addEventListener('click', () => {
                 advancedOptionsDiv.classList.toggle('hidden');
                 advancedOptionsDiv.classList.toggle('block');
+                if (advancedOptionsDiv.classList.contains('block')) {
+                    toggleAdvancedBtn.textContent = 'Hide Advanced HOS Options';
+                } else {
+                    toggleAdvancedBtn.textContent = 'Show Advanced HOS Options';
+                }
                 // Only recalculate if advanced options are now visible OR if they were just hidden and we need to update the basic result
                 calculateETA();
+                saveCalculatorState(); // Save state of toggle
             });
 
             toggleChainingBtn.addEventListener('click', () => {
@@ -1692,6 +2078,7 @@
                     toggleChainingBtn.textContent = 'Show Destination Chaining Options';
                 }
                 calculateETA(); // Recalculate when visibility changes
+                saveCalculatorState(); // Save state of toggle
             });
 
             toggleLogSheetBtn.addEventListener('click', () => {
@@ -1703,7 +2090,7 @@
                 } else {
                     toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
                 }
-                // No ETA recalculation needed just for showing/hiding log sheet
+                saveCalculatorState(); // Save state of toggle
             });
 
             // Event Listeners for dynamic leg management
@@ -1715,17 +2102,247 @@
             });
 
             // Event listeners for advanced HOS options
-            apply14HourRuleCheckbox.addEventListener('change', calculateETA);
-            include10HourOffDutyCheckbox.addEventListener('change', calculateETA);
-            consider70HourClockCheckbox.addEventListener('change', calculateETA);
+            apply14HourRuleCheckbox.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
+            include10HourOffDutyCheckbox.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
+            consider70HourClockCheckbox.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
             current70HourClockInput.addEventListener('input', () => {
-                // Only trigger ETA if not linked, otherwise updateHOSFromLogs handles it
+                // Only trigger ETA and save if not linked, otherwise updateHOSFromLogs handles it
                 if (!linkLogsToCalculatorCheckbox.checked) {
                     calculateETA();
+                    saveCalculatorState();
                 }
             });
-            bufferPercentageInput.addEventListener('input', calculateETA);
-            enableRoundTripCheckbox.addEventListener('change', calculateETA);
+            bufferPercentageInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
+            enableRoundTripCheckbox.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
+
+            // --- Comment Modal Functions ---
+            function showCommentModal() {
+                commentModal.classList.remove('hidden');
+            }
+
+            function hideCommentModal() {
+                commentModal.classList.add('hidden');
+                commentInput.value = ''; // Clear input when closing
+            }
+
+            // Firestore collection reference for comments
+            const commentsCollectionRef = collection(db, `artifacts/${appId}/public/comments`);
+            // Firestore collection reference for user-specific hidden comments
+            const getHiddenCommentsCollectionRef = (userId) => collection(db, `artifacts/${appId}/users/${userId}/hiddenComments`);
+
+            let hiddenCommentIds = new Set(); // Store IDs of comments hidden by the current user
+
+            // Function to load hidden comments for the current user
+            async function loadHiddenComments() {
+                const currentUserId = getFirebaseUserId();
+                if (!currentUserId || !db || !getIsAuthReady()) {
+                    console.warn("User not authenticated or Firestore not ready. Cannot load hidden comments.");
+                    hiddenCommentIds.clear(); // Clear any previous hidden comments
+                    return;
+                }
+
+                try {
+                    const hiddenCommentsSnapshot = await getDocs(getHiddenCommentsCollectionRef(currentUserId));
+                    hiddenCommentIds.clear(); // Clear previous state
+                    hiddenCommentsSnapshot.forEach(doc => {
+                        hiddenCommentIds.add(doc.id); // Doc ID is the comment ID
+                    });
+                    console.log("Hidden comments loaded for current user.");
+                } catch (e) {
+                    console.error("Error loading hidden comments:", e);
+                    errorMessageDiv.textContent = "Error loading your hidden comments.";
+                }
+            }
+
+            // Function to listen for real-time comments
+            async function listenForComments() {
+                if (!db || !getIsAuthReady()) {
+                    console.warn("Firestore not ready for comments. Retrying...");
+                    return;
+                }
+
+                // Load hidden comments first, then listen for public comments
+                await loadHiddenComments();
+
+                // Order by timestamp descending, limit to a reasonable number of recent comments
+                const q = query(commentsCollectionRef, orderBy("timestamp", "desc"));
+
+                onSnapshot(q, (snapshot) => {
+                    commentsDisplayArea.innerHTML = ''; // Clear previous comments
+                    if (snapshot.empty) {
+                        commentsDisplayArea.innerHTML = '<p class="text-center text-gray-500">No comments yet. Be the first!</p>';
+                        return;
+                    }
+                    snapshot.forEach((doc) => {
+                        const commentData = doc.data();
+                        const commentId = doc.id; // Get the document ID for deletion
+
+                        // Skip rendering if this comment is in the current user's hidden list
+                        if (hiddenCommentIds.has(commentId)) {
+                            return;
+                        }
+
+                        const commentEntry = document.createElement('div');
+                        commentEntry.classList.add('comment-entry');
+
+                        const timestamp = commentData.timestamp ? new Date(commentData.timestamp.toDate()).toLocaleString() : 'N/A';
+                        const userIdDisplay = commentData.userId || 'Anonymous'; // Fallback for anonymous
+
+                        commentEntry.innerHTML = `
+                            <strong>User ID: ${userIdDisplay}</strong>
+                            <span class="timestamp">${timestamp}</span>
+                            <p>${commentData.commentText}</p>
+                        `;
+
+                        // Add Hide button for all users
+                        const hideBtn = document.createElement('button');
+                        hideBtn.classList.add('hide-comment-btn');
+                        hideBtn.textContent = 'Hide';
+                        hideBtn.dataset.commentId = commentId; // Store comment ID for hiding
+                        commentEntry.appendChild(hideBtn);
+
+                        // Add delete button only if current user is the ADMIN_UID
+                        if (getFirebaseUserId() === getAdminUID() && getAdminUID() !== 'YOUR_ADMIN_FIREBASE_UID_HERE') { // Also check if ADMIN_UID is not the placeholder
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.classList.add('delete-comment-btn');
+                            deleteBtn.textContent = 'Delete';
+                            deleteBtn.dataset.commentId = commentId; // Store comment ID for deletion
+                            commentEntry.appendChild(deleteBtn);
+                        }
+                        commentsDisplayArea.appendChild(commentEntry);
+                    });
+                }, (error) => {
+                    console.error("Error listening to comments:", error);
+                    commentsDisplayArea.innerHTML = '<p class="text-red-500 text-center">Error loading comments.</p>';
+                });
+            }
+
+            // Function for user to hide a comment from their view
+            async function hideComment(commentId) {
+                const currentUserId = getFirebaseUserId();
+                if (!currentUserId || !db || !getIsAuthReady()) {
+                    errorMessageDiv.textContent = "Authentication not ready. Cannot hide comment.";
+                    return;
+                }
+
+                try {
+                    // Add the comment ID to the user's hiddenComments subcollection
+                    const hideDocRef = doc(getHiddenCommentsCollectionRef(currentUserId), commentId);
+                    await setDoc(hideDocRef, { hiddenAt: serverTimestamp() });
+                    hiddenCommentIds.add(commentId); // Add to local set immediately
+                    console.log(`Comment ${commentId} hidden for user ${currentUserId}.`);
+                    errorMessageDiv.textContent = ''; // Clear any previous error
+                    // Re-render comments to reflect the change
+                    listenForComments(); // This will re-fetch and filter
+                } catch (e) {
+                    console.error("Error hiding comment:", e);
+                    errorMessageDiv.textContent = "Error hiding comment. Please try again.";
+                }
+            }
+
+
+            // Function to delete a comment (Admin only)
+            async function deleteComment(commentId) {
+                const currentUserId = getFirebaseUserId();
+                const adminUid = getAdminUID();
+
+                if (!currentUserId || currentUserId !== adminUid || adminUid === 'YOUR_ADMIN_FIREBASE_UID_HERE') {
+                    errorMessageDiv.textContent = "You do not have permission to delete comments.";
+                    console.warn("Attempted delete by non-admin or placeholder admin UID.");
+                    return;
+                }
+
+                // Using a custom modal for confirmation instead of window.confirm
+                showCustomConfirm("Are you sure you want to delete this comment? This action cannot be undone.", async () => {
+                    try {
+                        const commentDocRef = doc(db, `artifacts/${appId}/public/comments`, commentId);
+                        await deleteDoc(commentDocRef);
+                        console.log("Comment deleted successfully:", commentId);
+                        errorMessageDiv.textContent = ''; // Clear any previous error
+                        // No need to explicitly remove from hiddenCommentIds here, as listenForComments() will re-render
+                    } catch (e) {
+                        console.error("Error deleting comment:", e);
+                        errorMessageDiv.textContent = "Error deleting comment. Please try again.";
+                    }
+                });
+            }
+
+            // Function to show a custom confirmation modal
+            function showCustomConfirm(message, onConfirm) {
+                const confirmModalHtml = `
+                    <div id="customConfirmModal" class="comment-modal-overlay">
+                        <div class="comment-modal-content">
+                            <h2 class="text-xl font-semibold mb-4">${message}</h2>
+                            <div class="flex justify-center gap-4">
+                                <button id="confirmYesBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl">Yes, Delete</button>
+                                <button id="confirmNoBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-xl">No, Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', confirmModalHtml);
+
+                const customConfirmModal = document.getElementById('customConfirmModal');
+                document.getElementById('confirmYesBtn').addEventListener('click', () => {
+                    onConfirm();
+                    customConfirmModal.remove();
+                });
+                document.getElementById('confirmNoBtn').addEventListener('click', () => {
+                    customConfirmModal.remove();
+                });
+            }
+
+
+            // Event listener for comment submission
+            submitCommentBtn.addEventListener('click', async () => {
+                const commentText = commentInput.value.trim();
+                const currentUserId = getFirebaseUserId();
+
+                if (!commentText) {
+                    errorMessageDiv.textContent = "Comment cannot be empty.";
+                    return;
+                }
+                if (!currentUserId) {
+                    errorMessageDiv.textContent = "Authentication failed. Cannot submit comment.";
+                    return;
+                }
+
+                try {
+                    await addDoc(commentsCollectionRef, {
+                        userId: currentUserId,
+                        commentText: commentText,
+                        timestamp: serverTimestamp() // Firestore server timestamp
+                    });
+                    commentInput.value = ''; // Clear input
+                    errorMessageDiv.textContent = ''; // Clear any previous error
+                    console.log("Comment submitted successfully.");
+                } catch (e) {
+                    console.error("Error adding comment:", e);
+                    errorMessageDiv.textContent = "Error submitting comment. Please try again.";
+                }
+            });
+
+            // Event listeners for comment modal
+            showCommentsBtn.addEventListener('click', showCommentModal);
+            closeCommentModalBtn.addEventListener('click', hideCommentModal);
+            // Close modal if user clicks outside of it
+            commentModal.addEventListener('click', (event) => {
+                if (event.target === commentModal) {
+                    hideCommentModal();
+                }
+            });
+
+            // Event delegation for delete and hide buttons within commentsDisplayArea
+            commentsDisplayArea.addEventListener('click', (event) => {
+                if (event.target.classList.contains('delete-comment-btn')) {
+                    const commentId = event.target.dataset.commentId;
+                    deleteComment(commentId);
+                } else if (event.target.classList.contains('hide-comment-btn')) {
+                    const commentId = event.target.dataset.commentId;
+                    hideComment(commentId);
+                }
+            });
+
 
             // --- Branding Static Image Setup ---
             // Instructions for user:
@@ -1755,8 +2372,10 @@
             // Set Issues Link (already correct)
             issuesLink.href = "https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues";
 
+            // Load state from local storage first
+            loadCalculatorState();
 
-            // Initial calculation when page loads
+            // Initial calculation when page loads (after loading state)
             calculateETA();
 
             // Load logs for the current date after Firebase authentication is ready
@@ -1780,3 +2399,4 @@
         });
     </script>
 </body>
+</html>
