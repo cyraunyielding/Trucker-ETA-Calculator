@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TruckerPro ETA Calculator</title>
+    <!-- theBacchanalian -->
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDKs -->
@@ -34,6 +35,7 @@
         let userId = null; // Will store the authenticated user's ID
         let isAuthReady = false; // Flag to indicate if authentication is complete
 
+        <!-- theBacchanalian -->
         // IMPORTANT: Replace 'YOUR_ADMIN_FIREBASE_UID_HERE' with your actual Firebase User ID (UID).
         // You can find your UID by inspecting the console after signing in anonymously to your deployed app,
         // or by checking the Firebase Authentication section in your project.
@@ -54,6 +56,8 @@
                 }
                 // Start listening for comments once authenticated
                 listenForComments(); // This will now also load hidden comments
+                // Start listening for announcements once authenticated
+                listenForAnnouncements(); // New: Listen for announcements
             } else {
                 // Sign in anonymously if no user is authenticated
                 try {
@@ -101,13 +105,9 @@
             width: 100%;
             text-align: center;
             border: 1px solid #e2e8f0; /* Subtle border */
-            /* TEMP DEBUG: Add a border to see container boundaries */
-            /* border: 2px solid purple !important; */
         }
         .title-group {
             margin-bottom: 1.75rem;
-            /* TEMP DEBUG: Add a border to see title-group boundaries */
-            /* border: 2px solid orange !important; */
         }
         .main-title {
             color: #2c3e50; /* Darker title color */
@@ -156,7 +156,7 @@
             cursor: not-allowed;
             border-color: #ced4da;
         }
-        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn, #updateLocationBtn, #showCommentsBtn, #submitCommentBtn, .hide-comment-btn { /* Added new buttons, including updateLocationBtn */
+        #calculateBtn, #toggleAdvancedBtn, #resetBtn, #toggleChainingBtn, #toggleLogSheetBtn, .add-leg-btn, .remove-leg-btn, #addLogEntryBtn, .edit-log-btn, .delete-log-btn, #updateLocationBtn, #showCommentsBtn, #submitCommentBtn, .hide-comment-btn, #toggleAnnouncementsBtn, #saveAnnouncementBtn { /* Added new buttons, including updateLocationBtn */
             background-image: linear-gradient(to right, #4299e1, #3182ce); /* Gradient button */
             color: white;
             padding: 0.85rem 1.75rem;
@@ -170,12 +170,12 @@
             width: 100%; /* Full width button */
             margin-top: 1rem; /* Space between buttons */
         }
-        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover, #updateLocationBtn:hover, #showCommentsBtn:hover, #submitCommentBtn:hover, .hide-comment-btn:hover { /* Added new buttons */
+        #calculateBtn:hover, #toggleAdvancedBtn:hover, #resetBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, .add-leg-btn:hover, .remove-leg-btn:hover, #addLogEntryBtn:hover, .edit-log-btn:hover, .delete-log-btn:hover, #updateLocationBtn:hover, #showCommentsBtn:hover, #submitCommentBtn:hover, .hide-comment-btn:hover, #toggleAnnouncementsBtn:hover, #saveAnnouncementBtn:hover { /* Added new buttons */
             background-image: linear-gradient(to right, #3182ce, #2b6cb0);
             box-shadow: 0 6px 15px rgba(66, 153, 225, 0.4);
             transform: translateY(-2px); /* Slight lift effect */
         }
-        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active, #updateLocationBtn:active, #showCommentsBtn:active, #submitCommentBtn:active, .hide-comment-btn:active { /* Added new buttons */
+        #calculateBtn:active, #toggleAdvancedBtn:active, #resetBtn:active, #toggleChainingBtn:active, #toggleLogSheetBtn:active, .add-leg-btn:active, .remove-leg-btn:active, #addLogEntryBtn:active, .edit-log-btn:active, .delete-log-btn:active, #updateLocationBtn:active, #showCommentsBtn:active, #submitCommentBtn:active, .hide-comment-btn:active, #toggleAnnouncementsBtn:active, #saveAnnouncementBtn:active { /* Added new buttons */
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 153, 225, 0.2);
         }
@@ -186,10 +186,10 @@
         #resetBtn:hover, .delete-log-btn:hover {
             background-image: linear-gradient(to right, #c53030, #a02020);
         }
-        #toggleAdvancedBtn, #toggleChainingBtn, #toggleLogSheetBtn { /* Grey buttons for toggles */
+        #toggleAdvancedBtn, #toggleChainingBtn, #toggleLogSheetBtn, #showCommentsBtn, #toggleAnnouncementsBtn { /* Grey buttons for toggles */
             background-image: linear-gradient(to right, #607d8b, #455a64);
         }
-        #toggleAdvancedBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover {
+        #toggleAdvancedBtn:hover, #toggleChainingBtn:hover, #toggleLogSheetBtn:hover, #showCommentsBtn:hover, #toggleAnnouncementsBtn:hover {
             background-image: linear-gradient(to right, #455a64, #37474f);
         }
         .result-area {
@@ -220,14 +220,14 @@
             text-align: left;
         }
 
-        /* Advanced Options Styling */
-        #advancedOptions, #chainingOptions, #logSheetSection { /* Apply to all collapsible sections */
+        /* Collapsible Section Styling (Advanced, Chaining, Log Sheet, Comments, Announcements) */
+        #advancedOptions, #chainingOptions, #logSheetSection, #commentsSectionContent, #announcementsSectionContent {
             border-top: 1px solid #e2e8f0;
             margin-top: 2rem;
             padding-top: 1.5rem;
             text-align: left;
         }
-        #advancedOptions h2, #chainingOptions h2, #logSheetSection h2 {
+        #advancedOptions h2, #chainingOptions h2, #logSheetSection h2, #commentsSectionContent h2, #announcementsSectionContent h2 {
             font-size: 1.5rem;
             font-weight: 700;
             color: #2c3e50;
@@ -262,19 +262,19 @@
             font-size: 0.8rem; /* Slightly smaller for tips */
             color: #718096;
         }
-        .advanced-input-group, .leg-input-group, .log-input-group {
+        .advanced-input-group, .leg-input-group, .log-input-group, .comment-input-group, .announcement-input-group { /* Added announcement-input-group */
             margin-top: 1rem;
             margin-bottom: 1.25rem;
             text-align: left;
         }
-        .advanced-input-group label, .leg-input-group label, .log-input-group label {
+        .advanced-input-group label, .leg-input-group label, .log-input-group label, .comment-input-group label, .announcement-input-group label {
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
             color: #4a5568;
             font-size: 1rem;
         }
-        .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea {
+        .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea, .comment-input-group textarea, .announcement-input-group textarea { /* Added announcement-input-group textarea */
             width: 100%;
             padding: 0.75rem 1rem;
             border: 2px solid #cbd5e0;
@@ -284,7 +284,7 @@
             outline: none;
             transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
-        .advanced-input-group input:focus, .leg-input-group input:focus, .leg-input-group select:focus, .log-input-group input:focus, .log-input-group select:focus, .log-input-group textarea:focus {
+        .advanced-input-group input:focus, .leg-input-group input:focus, .leg-input-group select:focus, .log-input-group input:focus, .log-input-group select:focus, .log-input-group textarea:focus, .comment-input-group textarea:focus, .announcement-input-group textarea:focus { /* Added announcement-input-group textarea */
             border-color: #4299e1;
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
         }
@@ -383,8 +383,6 @@
             margin-bottom: 1.5rem;
             display: flex;
             justify-content: center;
-            /* TEMP DEBUG: Add a border to see logo-container boundaries */
-            /* border: 2px solid blue !important; */
         }
         .logo-container img {
             max-width: 150px;
@@ -492,7 +490,7 @@
 
         /* Responsive adjustments for advanced section */
         @media (max-width: 640px) {
-            #advancedOptions h2, #chainingOptions h2, #logSheetSection h2 {
+            #advancedOptions h2, #chainingOptions h2, #logSheetSection h2, #commentsSectionContent h2, #announcementsSectionContent h2 {
                 font-size: 1.25rem;
             }
             .checkbox-group {
@@ -506,10 +504,10 @@
                 font-size: 0.7rem; /* Even smaller on mobile */
                 margin-left: calc(1.2em + 0.75rem); /* Maintain indent */
             }
-            .advanced-input-group label, .leg-input-group label, .log-input-group label {
+            .advanced-input-group label, .leg-input-group label, .log-input-group label, .comment-input-group label, .announcement-input-group label {
                 font-size: 0.9rem;
             }
-            .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea {
+            .advanced-input-group input, .leg-input-group input, .leg-input-group select, .log-input-group input, .log-input-group select, .log-input-group textarea, .comment-input-group textarea, .announcement-input-group textarea {
                 padding: 0.6rem 0.8rem;
                 font-size: 0.9rem;
             }
@@ -547,94 +545,30 @@
             }
         }
 
-        /* Comment Modal Styles */
-        .comment-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black overlay */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000; /* Ensure it's on top of everything */
-        }
-
-        .comment-modal-content {
-            background-color: #ffffff;
-            padding: 2rem;
-            border-radius: 1.5rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            max-width: 500px;
-            width: 90%; /* Responsive width */
-            position: relative;
-            max-height: 80vh; /* Max height for scrollability */
-            overflow-y: auto; /* Enable scrolling for content */
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .comment-modal-content h2 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-            text-align: center;
-        }
-
-        .comment-modal-content textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #cbd5e0;
-            border-radius: 0.75rem;
-            font-size: 1rem;
-            min-height: 80px;
-            resize: vertical; /* Allow vertical resizing */
-        }
-
-        .comment-modal-content .close-button {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #718096;
-            transition: color 0.2s ease;
-        }
-
-        .comment-modal-content .close-button:hover {
-            color: #e53e3e;
-        }
-
-        .comments-display-area {
+        /* Comments Section Specific Styles (formerly modal, now inline) */
+        .comments-display-area, .announcements-display-area { /* Applied to both comments and announcements */
             border-top: 1px solid #e2e8f0;
             padding-top: 1rem;
             margin-top: 1rem;
             max-height: 300px; /* Max height for comment list */
             overflow-y: auto; /* Scroll for comments */
+            display: flex; /* Changed to flex for better internal layout */
+            flex-direction: column;
+            gap: 0.75rem; /* Space between comments */
         }
 
-        .comment-entry {
+        .comment-entry, .announcement-entry { /* Applied to both comments and announcements */
             background-color: #f8fafc;
             border: 1px solid #edf2f7;
             border-radius: 0.5rem;
             padding: 0.75rem;
-            margin-bottom: 0.75rem;
             text-align: left;
             display: flex;
             flex-direction: column;
-            position: relative; /* For delete button positioning */
+            position: relative; /* For delete/hide button positioning */
         }
 
-        .comment-entry:last-child {
-            margin-bottom: 0;
-        }
-
-        .comment-entry strong {
+        .comment-entry strong, .announcement-entry strong {
             color: #3182ce;
             font-size: 0.9rem;
             display: block;
@@ -642,20 +576,20 @@
             word-break: break-all; /* Ensure long IDs wrap */
         }
 
-        .comment-entry .timestamp {
+        .comment-entry .timestamp, .announcement-entry .timestamp {
             font-size: 0.75rem;
             color: #718096;
             margin-bottom: 0.5rem;
             display: block;
         }
 
-        .comment-entry p {
+        .comment-entry p, .announcement-entry p {
             font-size: 0.9rem;
             color: #4a5568;
             line-height: 1.4;
         }
 
-        .comment-entry .delete-comment-btn {
+        .comment-entry .delete-comment-btn, .announcement-entry .delete-announcement-btn { /* Added announcement delete button */
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
@@ -669,7 +603,7 @@
             transition: background-color 0.2s ease;
         }
 
-        .comment-entry .delete-comment-btn:hover {
+        .comment-entry .delete-comment-btn:hover, .announcement-entry .delete-announcement-btn:hover {
             background-color: #c53030;
         }
 
@@ -694,6 +628,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- theBacchanalian -->
         <div class="logo-container">
             <img id="truckLogo" src="YOUR_TRUCK_LOGO_IMAGE_URL_HERE" alt="Trucker ETA Logo">
         </div>
@@ -728,25 +663,66 @@
             <select id="currentTZ" class="rounded-xl">
                 <!-- Options will be populated by JavaScript -->
             </select>
-            <p class="tip">Your device's time zone is pre-selected if possible. This is the starting time zone for your entire trip.</p>
+            <p class="tip">Your device's time zone is pre-selected if possible. This is the starting time zone for your entire trip. Lat/Long input will override this selection.</p>
+            <div class="checkbox-group mt-2"> <!-- Added mt-2 for spacing -->
+                <input type="checkbox" id="showManualCurrentLatLon">
+                <label for="showManualCurrentLatLon" class="text-sm font-normal">Lat/Long</label>
+            </div>
         </div>
+
+        <!-- Manual Current Location Lat/Lon Inputs (hidden by default) -->
+        <div id="manualCurrentLatLonOptions" class="hidden">
+            <div class="input-group">
+                <label for="currentLat">Current Latitude (for planning):</label>
+                <input type="number" id="currentLat" placeholder="e.g., 34.0522" step="0.000001" class="rounded-xl">
+            </div>
+            <div class="input-group">
+                <label for="currentLon">Current Longitude (for planning):</label>
+                <input type="number" id="currentLon" placeholder="e.g., -118.2437" step="0.000001" class="rounded-xl">
+            </div>
+            <div id="currentInferredTZDisplay" class="location-display text-center"></div>
+            <p class="tip">Time zone for trip start will be inferred from these coordinates.</p>
+        </div>
+        <!-- End Manual Current Location Lat/Lon Inputs -->
+
+        <!-- Always visible GPS Current Location -->
+        <button id="updateLocationBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+            Update Current Location (GPS)
+        </button>
+        <div id="currentLocationDisplay" class="location-display"></div>
+        <p class="tip">
+            This button provides your *actual* current Latitude and Longitude. It does not influence the calculator's logic and your location data is not stored or shared.
+        </p>
+        <!-- End Always visible GPS Current Location -->
+
 
         <div class="input-group">
             <label for="destinationTZ">Destination Time Zone (Leg 1):</label>
             <select id="destinationTZ" class="rounded-xl">
                 <!-- Options will be populated by JavaScript -->
             </select>
-            <p class="tip">This is the time zone for your first destination.</p>
+            <p class="tip">The time zone of your first destination. Lat/Long input will override this selection.</p>
+            <div class="checkbox-group mt-2"> <!-- Added mt-2 for spacing -->
+                <input type="checkbox" id="showDestLatLon1">
+                <label for="showDestLatLon1" class="text-sm font-normal">Lat/Long</label>
+            </div>
         </div>
 
-        <button id="updateLocationBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
-            Update Current Location (GPS)
-        </button>
-        <div id="currentLocationDisplay" class="location-display"></div>
-        <p class="tip">
-            This button provides your current Latitude and Longitude. It does not influence the calculator's logic and your location data is not stored or shared.
-        </p>
-
+        <!-- Leg 1 Destination Lat/Lon Inputs (hidden by default) -->
+        <div id="leg1DestLatLonOptions" class="hidden">
+            <div class="input-group">
+                <label for="destinationLat">Destination Latitude (Leg 1):</label>
+                <input type="number" id="destinationLat" placeholder="e.g., 34.0522" step="0.000001" class="rounded-xl">
+            </div>
+            <div class="input-group">
+                <label for="destinationLon">Destination Longitude (Leg 1):</label>
+                <input type="number" id="destinationLon" placeholder="e.g., -118.2437" step="0.000001" class="rounded-xl">
+            </div>
+            <div id="leg1DestinationTZDisplay" class="location-display text-center"></div>
+            <p class="tip">Time zone will be inferred from these coordinates.</p>
+        </div>
+        <!-- End Leg 1 Destination Lat/Lon Inputs -->
+        <!-- theBacchanalian -->
 
         <button id="calculateBtn" class="rounded-xl">Calculate ETA</button>
         <button id="resetBtn" class="rounded-xl">Reset Calculator</button>
@@ -814,7 +790,7 @@
             </div>
             <button id="addLegBtn" class="add-leg-btn rounded-xl">Add Another Destination Leg</button>
         </div>
-
+        <!-- theBacchanalian -->
         <button id="toggleLogSheetBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
             Show Log Sheet Tracker
         </button>
@@ -897,17 +873,12 @@
         <div id="errorMessage" class="error-message"></div>
 
         <div class="footer-content">
-            <p>Authored by Mark Bird</p>
-            <a id="githubLink" href="https://github.com/cyraunyielding" target="_blank" rel="noopener noreferrer">Visit my GitHub</a>
-            <a id="issuesLink" href="https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues" target="_blank" rel="noopener noreferrer">Report Issues or Suggestions</a>
-            <button id="showCommentsBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
-                The Comments Section
-            </button>
+            <!-- theBacchanalian -->
             <p class="text-sm mt-2">
                 *HOS Disclaimer: The calculator’s HOS logic is a practical simulation, not a full regulatory compliance tool.
             </p>
             <div class="qr-code-container">
-                <img id="qrCodeImage" src="YOUR_QR_CODE_IMAGE_URL_HERE" alt="QR Code to Calculator">
+                <img id="qrCodeImage" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://cyraunyielding.github.io/Trucker-ETA-Calculator/" alt="QR Code to Calculator">
                 <p>Scan to share this calculator!</p>
             </div>
 
@@ -916,23 +887,54 @@
                 <p class="text-base font-semibold text-gray-700 mb-2">Support This Project:</p>
                 <div id="paypal-container-JSEAH3HWUE9VG"></div>
             </div>
-        </div>
-    </div>
 
-    <!-- Comment Modal Structure -->
-    <div id="commentModal" class="comment-modal-overlay hidden">
-        <div class="comment-modal-content">
-            <button class="close-button" id="closeCommentModalBtn">&times;</button>
-            <h2>Comments & Feedback</h2>
-            <textarea id="commentInput" rows="4" placeholder="Share your thoughts or suggestions here..." class="rounded-xl"></textarea>
-            <button id="submitCommentBtn" class="rounded-xl">Submit Comment</button>
-            <div class="comments-display-area" id="commentsDisplayArea">
-                <p class="text-center text-gray-500">Loading comments...</p>
+            <p>Authored by Mark Bird</p>
+            <a id="githubLink" href="https://github.com/cyraunyielding" target="_blank" rel="noopener noreferrer">Visit my GitHub</a>
+            <a id="issuesLink" href="https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues" target="_blank" rel="noopener noreferrer">Report Issues or Suggestions</a>
+
+            <button id="toggleAnnouncementsBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+                Show Announcements
+            </button>
+
+            <!-- New Collapsible Announcements Section Content -->
+            <div id="announcementsSectionContent" class="hidden">
+                <h2>Announcements</h2>
+                <div id="adminAnnouncementInput" class="announcement-input-group hidden">
+                    <label for="announcementInput">New Announcement:</label>
+                    <textarea id="announcementInput" rows="3" placeholder="Type your announcement here..." class="rounded-xl"></textarea>
+                    <button id="saveAnnouncementBtn" class="rounded-xl">Post Announcement</button>
+                </div>
+                <div class="announcements-display-area" id="announcementsDisplayArea">
+                    <p class="text-center text-gray-500">No announcements yet.</p>
+                </div>
             </div>
+            <!-- End New Collapsible Announcements Section Content -->
+
+            <button id="showCommentsBtn" class="rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
+                The Comments Section
+            </button>
+
+            <!-- Collapsible Comments Section Content -->
+            <div id="commentsSectionContent" class="hidden">
+                <h2>Comments & Feedback</h2>
+                <div class="comment-input-group">
+                    <textarea id="commentInput" rows="4" placeholder="Share your thoughts or suggestions here..." class="rounded-xl"></textarea>
+                </div>
+                <button id="submitCommentBtn" class="rounded-xl">Submit Comment</button>
+                <div class="comments-display-area" id="commentsDisplayArea">
+                    <p class="text-center text-gray-500">Loading comments...</p>
+                </div>
+            </div>
+            <!-- End Collapsible Comments Section Content -->
+
         </div>
     </div>
 
     <script>
+        // IMPORTANT: Replace 'YOUR_GOOGLE_MAPS_API_KEY_HERE' with your actual Google Maps API Key.
+        // This key needs to have the "Time Zone API" enabled.
+        const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY_HERE';
+        <!-- theBacchanalian -->
         // Ensure Firebase instances are available globally (from the module script in head)
         let db;
         let auth;
@@ -956,7 +958,22 @@
             const speedInput = document.getElementById('speed');
             const dailyDrivingLimitSelect = document.getElementById('dailyDrivingLimit');
             const currentTZSelect = document.getElementById('currentTZ'); // Trip start TZ
-            const destinationTZInput = document.getElementById('destinationTZ'); // Now for Leg 1
+            const destinationTZSelect = document.getElementById('destinationTZ'); // Leg 1 Destination TZ Select
+
+            // New Lat/Lon toggle elements for CURRENT location (manual input)
+            const showManualCurrentLatLonCheckbox = document.getElementById('showManualCurrentLatLon');
+            const manualCurrentLatLonOptionsDiv = document.getElementById('manualCurrentLatLonOptions');
+            const currentLatInput = document.getElementById('currentLat');
+            const currentLonInput = document.getElementById('currentLon');
+            const currentInferredTZDisplay = document.getElementById('currentInferredTZDisplay');
+
+            // Lat/Lon toggle elements for DESTINATION (Leg 1)
+            const showDestLatLon1Checkbox = document.getElementById('showDestLatLon1');
+            const leg1DestLatLonOptionsDiv = document.getElementById('leg1DestLatLonOptions');
+            const destinationLatInput = document.getElementById('destinationLat');
+            const destinationLonInput = document.getElementById('destinationLon');
+            const leg1DestinationTZDisplay = document.getElementById('leg1DestinationTZDisplay');
+
 
             // Buttons and sections
             const calculateBtn = document.getElementById('calculateBtn');
@@ -964,7 +981,7 @@
             const toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
             const toggleChainingBtn = document.getElementById('toggleChainingBtn');
             const toggleLogSheetBtn = document.getElementById('toggleLogSheetBtn'); // New toggle for log sheet
-            const updateLocationBtn = document.getElementById('updateLocationBtn'); // New location button
+            const updateLocationBtn = document.getElementById('updateLocationBtn'); // GPS location button
             const advancedOptionsDiv = document.getElementById('advancedOptions');
             const chainingOptionsDiv = document.getElementById('chainingOptions');
             const logSheetSection = document.getElementById('logSheetSection'); // New log sheet section
@@ -983,7 +1000,7 @@
             const resultDiv = document.getElementById('result');
             const advancedResultDiv = document.getElementById('advancedResult');
             const errorMessageDiv = document.getElementById('errorMessage');
-            const currentLocationDisplay = document.getElementById('currentLocationDisplay'); // New location display
+            const currentLocationDisplay = document.getElementById('currentLocationDisplay'); // GPS location display
 
             // Chaining specific elements
             const legsContainer = document.getElementById('legsContainer');
@@ -1001,13 +1018,20 @@
             const logEntriesTableBody = document.getElementById('logEntriesTableBody');
             const dailyLogSummary = document.getElementById('dailyLogSummary');
 
-            // Comment Modal elements
+            // Comment Section elements (now inline)
             const showCommentsBtn = document.getElementById('showCommentsBtn');
-            const commentModal = document.getElementById('commentModal');
-            const closeCommentModalBtn = document.getElementById('closeCommentModalBtn');
+            const commentsSectionContent = document.getElementById('commentsSectionContent'); // New element
             const commentInput = document.getElementById('commentInput');
             const submitCommentBtn = document.getElementById('submitCommentBtn');
             const commentsDisplayArea = document.getElementById('commentsDisplayArea');
+
+            // Announcement Section elements (new)
+            const toggleAnnouncementsBtn = document.getElementById('toggleAnnouncementsBtn');
+            const announcementsSectionContent = document.getElementById('announcementsSectionContent');
+            const adminAnnouncementInputDiv = document.getElementById('adminAnnouncementInput'); // The div containing input/save for admin
+            const announcementInput = document.getElementById('announcementInput');
+            const saveAnnouncementBtn = document.getElementById('saveAnnouncementBtn');
+            const announcementsDisplayArea = document.getElementById('announcementsDisplayArea');
 
             // Branding elements
             const truckLogo = document.getElementById('truckLogo');
@@ -1054,9 +1078,9 @@
                 });
             }
 
-            // Populate initial time zone dropdowns (current TZ and Leg 1 destination TZ)
+            // Populate initial time zone dropdowns
             populateTimeZones(currentTZSelect);
-            populateTimeZones(destinationTZInput);
+            populateTimeZones(destinationTZSelect); // Populate destination TZ
 
             // Set user's current time zone as default for trip start
             try {
@@ -1064,12 +1088,15 @@
                 const matchingTZ = timeZones.find(tz => tz.id === userTimeZone);
                 if (matchingTZ) {
                     currentTZSelect.value = userTimeZone;
+                    destinationTZSelect.value = userTimeZone; // Also set destination to user's TZ by default
                 } else {
                     currentTZSelect.value = '';
+                    destinationTZSelect.value = '';
                 }
             } catch (e) {
                 console.error("Could not determine user's time zone:", e);
                 currentTZSelect.value = '';
+                destinationTZSelect.value = '';
             }
 
             // Utility function to format date for Firestore document ID (YYYY-MM-DD)
@@ -1083,6 +1110,114 @@
             // Set log date to today by default
             logDateInput.value = formatDateForFirestore(new Date());
 
+            // --- Time Zone API Function ---
+            // Cache for time zone lookups to avoid redundant API calls
+            const timeZoneCache = {};
+
+            async function getTimeZoneFromCoordinates(lat, lon, elementToUpdate, identifier = 'unknown') {
+                // If Lat/Lon are invalid, return null to indicate failure to infer
+                if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
+                    elementToUpdate.textContent = ''; // Clear display if no valid coords
+                    return null;
+                }
+
+                const cacheKey = `${lat},${lon}`;
+                if (timeZoneCache[cacheKey]) {
+                    elementToUpdate.textContent = `Inferred TZ: ${timeZoneCache[cacheKey].name} (${timeZoneCache[cacheKey].id})`;
+                    return timeZoneCache[cacheKey].id;
+                }
+
+                if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+                    errorMessageDiv.textContent = 'Google Maps API Key is missing or invalid. Time Zone lookup will not work.';
+                    elementToUpdate.textContent = 'API Key Missing (Cannot Infer TZ)';
+                    console.error('Google Maps API Key is missing or invalid.');
+                    return null; // Cannot infer without key
+                }
+
+                elementToUpdate.textContent = 'Fetching Time Zone...';
+                const timestamp = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+                const url = `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lon}&timestamp=${timestamp}&key=${GOOGLE_MAPS_API_KEY}`;
+
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (data.status === 'OK') {
+                        const timeZoneId = data.timeZoneId;
+                        const timeZoneName = data.timeZoneName;
+                        timeZoneCache[cacheKey] = { id: timeZoneId, name: timeZoneName };
+                        elementToUpdate.textContent = `Inferred TZ: ${timeZoneName} (${timeZoneId})`;
+                        return timeZoneId;
+                    } else {
+                        errorMessageDiv.textContent = `Error fetching time zone for ${identifier}: ${data.errorMessage || data.status}.`;
+                        elementToUpdate.textContent = `Error: ${data.status} (Cannot Infer TZ)`;
+                        console.error(`Time Zone API Error for ${identifier}:`, data);
+                        return null; // Cannot infer on API error
+                    }
+                } catch (error) {
+                    errorMessageDiv.textContent = `Network error fetching time zone for ${identifier}.`;
+                    elementToUpdate.textContent = 'Network Error (Cannot Infer TZ)';
+                    console.error(`Network error fetching time zone for ${identifier}:`, error);
+                    return null; // Cannot infer on network error
+                }
+            }
+
+            // Event Listeners for Manual Current Lat/Lon toggle
+            showManualCurrentLatLonCheckbox.addEventListener('change', async () => {
+                manualCurrentLatLonOptionsDiv.classList.toggle('hidden', !showManualCurrentLatLonCheckbox.checked);
+                manualCurrentLatLonOptionsDiv.classList.toggle('block', showManualCurrentLatLonCheckbox.checked);
+                if (showManualCurrentLatLonCheckbox.checked && currentLatInput.value && currentLonInput.value) {
+                    await getTimeZoneFromCoordinates(parseFloat(currentLatInput.value), parseFloat(currentLonInput.value), currentInferredTZDisplay, 'Current Location');
+                } else {
+                    currentInferredTZDisplay.textContent = ''; // Clear inferred TZ display
+                }
+                calculateETA();
+                saveCalculatorState();
+            });
+
+            currentLatInput.addEventListener('input', async () => {
+                if (showManualCurrentLatLonCheckbox.checked) {
+                    await getTimeZoneFromCoordinates(parseFloat(currentLatInput.value), parseFloat(currentLonInput.value), currentInferredTZDisplay, 'Current Location');
+                }
+                calculateETA(); saveCalculatorState();
+            });
+            currentLonInput.addEventListener('input', async () => {
+                if (showManualCurrentLatLonCheckbox.checked) {
+                    await getTimeZoneFromCoordinates(parseFloat(currentLatInput.value), parseFloat(currentLonInput.value), currentInferredTZDisplay, 'Current Location');
+                }
+                calculateETA(); saveCalculatorState();
+            });
+
+
+            // Event listeners for Leg 1 Destination Lat/Lon toggles
+            showDestLatLon1Checkbox.addEventListener('change', async () => {
+                leg1DestLatLonOptionsDiv.classList.toggle('hidden', !showDestLatLon1Checkbox.checked);
+                leg1DestLatLonOptionsDiv.classList.toggle('block', showDestLatLon1Checkbox.checked);
+                // If lat/lon inputs are shown, try to infer TZ immediately
+                if (showDestLatLon1Checkbox.checked && destinationLatInput.value && destinationLonInput.value) {
+                    await getTimeZoneFromCoordinates(parseFloat(destinationLatInput.value), parseFloat(destinationLonInput.value), leg1DestinationTZDisplay, 'Leg 1 Destination');
+                } else {
+                    leg1DestinationTZDisplay.textContent = ''; // Clear inferred TZ display
+                }
+                calculateETA();
+                saveCalculatorState();
+            });
+
+            // Event listeners for Leg 1 Destination Lat/Lon inputs to trigger TZ inference and calculation
+            destinationLatInput.addEventListener('input', async () => {
+                if (showDestLatLon1Checkbox.checked) { // Only infer if lat/lon section is visible
+                    await getTimeZoneFromCoordinates(parseFloat(destinationLatInput.value), parseFloat(destinationLonInput.value), leg1DestinationTZDisplay, 'Leg 1 Destination');
+                }
+                calculateETA(); saveCalculatorState();
+            });
+            destinationLonInput.addEventListener('input', async () => {
+                if (showDestLatLon1Checkbox.checked) { // Only infer if lat/lon section is visible
+                    await getTimeZoneFromCoordinates(parseFloat(destinationLonInput.value), parseFloat(destinationLonInput.value), leg1DestinationTZDisplay, 'Leg 1 Destination');
+                }
+                calculateETA(); saveCalculatorState();
+            });
+
+
             // --- Local Storage Persistence Functions ---
             function saveCalculatorState() {
                 const state = {
@@ -1090,21 +1225,29 @@
                     speed: speedInput.value,
                     dailyDrivingLimit: dailyDrivingLimitSelect.value,
                     currentTZ: currentTZSelect.value,
-                    destinationTZ: destinationTZInput.value,
-                    plannedDailyBreakTotal: plannedDailyBreakTotalInput.value, // Save new inputs
-                    onDutyPortionOfDailyBreak: onDutyPortionOfDailyBreakInput.value, // Save new inputs
+                    destinationTZ: destinationTZSelect.value,
+                    showManualCurrentLatLon: showManualCurrentLatLonCheckbox.checked, // Save new checkbox state
+                    currentLat: currentLatInput.value, // Save new manual current lat
+                    currentLon: currentLonInput.value, // Save new manual current lon
+                    showDestLatLon1: showDestLatLon1Checkbox.checked,
+                    destinationLat: destinationLatInput.value,
+                    destinationLon: destinationLonInput.value,
+                    plannedDailyBreakTotal: plannedDailyBreakTotalInput.value,
+                    onDutyPortionOfDailyBreak: onDutyPortionOfDailyBreakInput.value,
                     apply14HourRule: apply14HourRuleCheckbox.checked,
                     include10HourOffDuty: include10HourOffDutyCheckbox.checked,
                     consider70HourClock: consider70HourClockCheckbox.checked,
-                    current70HourClock: current70HourClockInput.value, // Save manual value
+                    current70HourClock: current70HourClockInput.value,
                     bufferPercentage: bufferPercentageInput.value,
                     enableRoundTrip: enableRoundTripCheckbox.checked,
                     linkLogsToCalculator: linkLogsToCalculatorCheckbox.checked,
-                    legs: [], // Store dynamic legs
+                    legs: [],
                     // Store visibility states of collapsible sections
                     advancedOptionsVisible: !advancedOptionsDiv.classList.contains('hidden'),
                     chainingOptionsVisible: !chainingOptionsDiv.classList.contains('hidden'),
-                    logSheetVisible: !logSheetSection.classList.contains('hidden')
+                    logSheetVisible: !logSheetSection.classList.contains('hidden'),
+                    commentsSectionVisible: !commentsSectionContent.classList.contains('hidden'),
+                    announcementsSectionVisible: !announcementsSectionContent.classList.contains('hidden')
                 };
 
                 // Save dynamic legs
@@ -1113,7 +1256,10 @@
                     const legNumber = index + 2;
                     state.legs.push({
                         miles: legElement.querySelector(`#miles-${legNumber}`).value,
-                        destTZ: legElement.querySelector(`#destinationTZ-${legNumber}`).value
+                        destTZ: legElement.querySelector(`#destinationTZ-${legNumber}`).value,
+                        destLat: legElement.querySelector(`#destinationLat-${legNumber}`).value,
+                        destLon: legElement.querySelector(`#destinationLon-${legNumber}`).value,
+                        showDestLatLon: legElement.querySelector(`#showDestLatLon-${legNumber}`).checked
                     });
                 });
 
@@ -1121,7 +1267,7 @@
                 console.log("Calculator state saved to local storage.");
             }
 
-            function loadCalculatorState() {
+            async function loadCalculatorState() {
                 const savedState = localStorage.getItem('truckerCalculatorState');
                 if (savedState) {
                     const state = JSON.parse(savedState);
@@ -1148,10 +1294,40 @@
                         dailyDrivingLimitSelect.value = '11';
                     }
 
+                    // Re-populate time zones after setting values to ensure options exist
+                    populateTimeZones(currentTZSelect);
+                    populateTimeZones(destinationTZSelect);
+
                     currentTZSelect.value = state.currentTZ || '';
-                    destinationTZInput.value = state.destinationTZ || '';
-                    plannedDailyBreakTotalInput.value = state.plannedDailyBreakTotal !== undefined ? state.plannedDailyBreakTotal : '1'; // Load new inputs
-                    onDutyPortionOfDailyBreakInput.value = state.onDutyPortionOfDailyBreak !== undefined ? state.onDutyPortionOfDailyBreak : '0.5'; // Load new inputs
+                    destinationTZSelect.value = state.destinationTZ || '';
+
+                    // Load and apply new manual current Lat/Lon checkbox state
+                    showManualCurrentLatLonCheckbox.checked = state.showManualCurrentLatLon || false;
+                    manualCurrentLatLonOptionsDiv.classList.toggle('hidden', !showManualCurrentLatLonCheckbox.checked);
+                    manualCurrentLatLonOptionsDiv.classList.toggle('block', showManualCurrentLatLonCheckbox.checked);
+                    currentLatInput.value = state.currentLat || '';
+                    currentLonInput.value = state.currentLon || '';
+                    if (showManualCurrentLatLonCheckbox.checked && currentLatInput.value && currentLonInput.value) {
+                        await getTimeZoneFromCoordinates(parseFloat(currentLatInput.value), parseFloat(currentLonInput.value), currentInferredTZDisplay, 'Current Location');
+                    } else {
+                        currentInferredTZDisplay.textContent = '';
+                    }
+
+                    // Load and apply destination Lat/Lon checkbox state
+                    showDestLatLon1Checkbox.checked = state.showDestLatLon1 || false;
+                    leg1DestLatLonOptionsDiv.classList.toggle('hidden', !showDestLatLon1Checkbox.checked);
+                    leg1DestLatLonOptionsDiv.classList.toggle('block', showDestLatLon1Checkbox.checked);
+                    destinationLatInput.value = state.destinationLat || '';
+                    destinationLonInput.value = state.destinationLon || '';
+                    if (showDestLatLon1Checkbox.checked && destinationLatInput.value && destinationLonInput.value) {
+                         await getTimeZoneFromCoordinates(parseFloat(destinationLatInput.value), parseFloat(destinationLonInput.value), leg1DestinationTZDisplay, 'Leg 1 Destination');
+                    } else {
+                        leg1DestinationTZDisplay.textContent = '';
+                    }
+
+
+                    plannedDailyBreakTotalInput.value = state.plannedDailyBreakTotal !== undefined ? state.plannedDailyBreakTotal : '1';
+                    onDutyPortionOfDailyBreakInput.value = state.onDutyPortionOfDailyBreak !== undefined ? state.onDutyPortionOfDailyBreak : '0.5';
                     apply14HourRuleCheckbox.checked = state.apply14HourRule || false;
                     include10HourOffDutyCheckbox.checked = state.include10HourOffDuty || false;
                     consider70HourClockCheckbox.checked = state.consider70HourClock || false;
@@ -1160,17 +1336,14 @@
                     enableRoundTripCheckbox.checked = state.enableRoundTrip || false;
                     linkLogsToCalculatorCheckbox.checked = state.linkLogsToCalculator || false;
 
-                    // Re-populate time zones after setting values to ensure options exist
-                    populateTimeZones(currentTZSelect);
-                    populateTimeZones(destinationTZInput);
 
                     // Load dynamic legs
                     legsContainer.innerHTML = ''; // Clear existing dynamic legs
                     legCounter = 1; // Reset counter
                     if (state.legs && state.legs.length > 0) {
-                        state.legs.forEach(legData => {
-                            addLeg(legData.miles, legData.destTZ); // Pass saved data to addLeg
-                        });
+                        for (const legData of state.legs) { // Use for...of for await inside loop
+                            await addLeg(legData.miles, legData.destTZ, legData.destLat, legData.destLon, legData.showDestLatLon); // Pass all saved data
+                        }
                     }
 
                     // Restore visibility of collapsible sections
@@ -1200,6 +1373,26 @@
                         logSheetSection.classList.add('hidden');
                         logSheetSection.classList.remove('block');
                         toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
+                    }
+                    // Restore comments section visibility
+                    if (state.commentsSectionVisible) {
+                        commentsSectionContent.classList.remove('hidden');
+                        commentsSectionContent.classList.add('block');
+                        showCommentsBtn.textContent = 'Hide Comments Section';
+                    } else {
+                        commentsSectionContent.classList.add('hidden');
+                        commentsSectionContent.classList.remove('block');
+                        showCommentsBtn.textContent = 'The Comments Section';
+                    }
+                    // Restore announcements section visibility
+                    if (state.announcementsSectionVisible) {
+                        announcementsSectionContent.classList.remove('hidden');
+                        announcementsSectionContent.classList.add('block');
+                        toggleAnnouncementsBtn.textContent = 'Hide Announcements';
+                    } else {
+                        announcementsSectionContent.classList.add('hidden');
+                        announcementsSectionContent.classList.remove('block');
+                        toggleAnnouncementsBtn.textContent = 'Show Announcements';
                     }
 
                     // Apply linked state immediately after loading
@@ -1689,7 +1882,7 @@
 
 
             // Function to add a new leg
-            function addLeg(miles = '', destTZ = '') { // Added parameters for loading from local storage
+            async function addLeg(miles = '', destTZ = '', destLat = '', destLon = '', showDestLatLon = false) { // Added parameters for loading from local storage
                 legCounter++; // This will make it Leg 2, Leg 3, etc.
                 const newLegHtml = `
                     <div class="leg-section" id="leg-${legCounter}">
@@ -1700,29 +1893,86 @@
                             <input type="number" id="miles-${legCounter}" placeholder="e.g., 500" class="rounded-xl" value="${miles}">
                         </div>
                         <div class="leg-input-group">
-                            <label for="destinationTZ-${legCounter}">Destination Time Zone for Leg ${legCounter}:</label>
+                            <label for="destinationTZ-${legCounter}">Destination Time Zone (Leg ${legCounter}):</label>
                             <select id="destinationTZ-${legCounter}" class="rounded-xl">
-                                <!-- Options populated by JS -->
+                                <!-- Options will be populated by JavaScript -->
                             </select>
+                            <p class="tip">The time zone of this destination. Lat/Long input will override this selection.</p>
+                            <div class="checkbox-group mt-2"> <!-- Moved checkbox here -->
+                                <input type="checkbox" id="showDestLatLon-${legCounter}" ${showDestLatLon ? 'checked' : ''}>
+                                <label for="showDestLatLon-${legCounter}" class="text-sm font-normal">Lat/Long</label>
+                            </div>
                         </div>
+                        <!-- Lat/Lon Inputs for dynamic leg (hidden by default) -->
+                        <div id="leg${legCounter}DestLatLonOptions" class="input-group ${showDestLatLon ? 'block' : 'hidden'}">
+                            <div class="input-group">
+                                <label for="destinationLat-${legCounter}">Destination Latitude (Leg ${legCounter}):</label>
+                                <input type="number" id="destinationLat-${legCounter}" placeholder="e.g., 34.0522" step="0.000001" class="rounded-xl" value="${destLat}">
+                            </div>
+                            <div class="input-group">
+                                <label for="destinationLon-${legCounter}">Destination Longitude (Leg ${legCounter}):</label>
+                                <input type="number" id="destinationLon-${legCounter}" placeholder="e.g., -118.2437" step="0.000001" class="rounded-xl" value="${destLon}">
+                            </div>
+                            <div id="leg${legCounter}DestinationTZDisplay" class="location-display text-center"></div>
+                            <p class="tip">Time zone will be inferred from these coordinates.</p>
+                        </div>
+                        <!-- End Lat/Lon Inputs for dynamic leg -->
                     </div>
                 `;
                 legsContainer.insertAdjacentHTML('beforeend', newLegHtml);
 
-                // Populate time zones for the new leg's destination
-                const newDestinationTZSelect = document.getElementById(`destinationTZ-${legCounter}`);
-                populateTimeZones(newDestinationTZSelect);
-                if (destTZ) {
-                    newDestinationTZSelect.value = destTZ;
+                // Get references to the new inputs and display div
+                const newDestTZSelect = document.getElementById(`destinationTZ-${legCounter}`);
+                const newShowDestLatLonCheckbox = document.getElementById(`showDestLatLon-${legCounter}`);
+                const newDestLatLonOptionsDiv = document.getElementById(`leg${legCounter}DestLatLonOptions`);
+                const newDestLatInput = document.getElementById(`destinationLat-${legCounter}`);
+                const newDestLonInput = document.getElementById(`destinationLon-${legCounter}`);
+                const newDestTZDisplay = document.getElementById(`leg${legCounter}DestinationTZDisplay`);
+
+                // Populate time zones for the new dropdown
+                populateTimeZones(newDestTZSelect);
+                newDestTZSelect.value = destTZ; // Set saved value
+
+                // Set initial visibility of lat/lon options
+                newDestLatLonOptionsDiv.classList.toggle('hidden', !newShowDestLatLonCheckbox.checked);
+                newDestLatLonOptionsDiv.classList.toggle('block', newShowDestLatLonCheckbox.checked);
+
+                // Infer time zone for the new leg if lat/lon are shown and have values
+                if (newShowDestLatLonCheckbox.checked && newDestLatInput.value && newDestLonInput.value) {
+                    await getTimeZoneFromCoordinates(parseFloat(newDestLatInput.value), parseFloat(newDestLonInput.value), newDestTZDisplay, `Leg ${legCounter} Destination`);
+                } else {
+                    newDestTZDisplay.textContent = ''; // Clear display if not using lat/lon
                 }
 
                 // Add event listeners to new inputs for recalculation and saving state
                 document.getElementById(`miles-${legCounter}`).addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
-                newDestinationTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
+                newDestTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // Listen for dropdown change
+                newShowDestLatLonCheckbox.addEventListener('change', async () => {
+                    newDestLatLonOptionsDiv.classList.toggle('hidden', !newShowDestLatLonCheckbox.checked);
+                    newDestLatLonOptionsDiv.classList.toggle('block', newShowDestLatLonCheckbox.checked);
+                    if (newShowDestLatLonCheckbox.checked && newDestLatInput.value && newDestLonInput.value) {
+                        await getTimeZoneFromCoordinates(parseFloat(newDestLatInput.value), parseFloat(newDestLonInput.value), newDestTZDisplay, `Leg ${legCounter} Destination`);
+                    } else {
+                        newDestTZDisplay.textContent = '';
+                    }
+                    calculateETA(); saveCalculatorState();
+                });
+                newDestLatInput.addEventListener('input', async () => {
+                    if (newShowDestLatLonCheckbox.checked) {
+                        await getTimeZoneFromCoordinates(parseFloat(newDestLatInput.value), parseFloat(newDestLonInput.value), newDestTZDisplay, `Leg ${legCounter} Destination`);
+                    }
+                    calculateETA(); saveCalculatorState();
+                });
+                newDestLonInput.addEventListener('input', async () => {
+                    if (newShowDestLatLonCheckbox.checked) {
+                        await getTimeZoneFromCoordinates(parseFloat(newDestLatInput.value), parseFloat(newDestLonInput.value), newDestTZDisplay, `Leg ${legCounter} Destination`);
+                    }
+                    calculateETA(); saveCalculatorState();
+                });
                 document.querySelector(`#leg-${legCounter} .remove-leg-btn`).addEventListener('click', removeLeg);
 
                 // Only calculate ETA and save state if not loading from local storage initially
-                if (miles === '' && destTZ === '') {
+                if (miles === '' && destTZ === '' && destLat === '' && destLon === '') {
                     calculateETA(); // Recalculate after adding a leg manually
                     saveCalculatorState();
                 }
@@ -1742,22 +1992,18 @@
             }
 
             // Function to perform the ETA calculation
-            function calculateETA() {
+            async function calculateETA() { // Made async to await time zone lookups
                 errorMessageDiv.textContent = '';
                 resultDiv.textContent = 'Calculating...';
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
 
                 const avgSpeed = parseFloat(speedInput.value);
-                // Use the value from the select, which will be updated by logs if linked
                 const dailyDriveLimit = parseFloat(dailyDrivingLimitSelect.value);
-                // Use the value from the input, which will be updated by logs if linked
                 let current70HrClock = parseFloat(current70HourClockInput.value);
                 let bufferPct = parseFloat(bufferPercentageInput.value);
 
-                // New granular break inputs
-                const plannedDailyBreakTotal = parseFloat(plannedDailyBreakTotalInput.value) || 1; // Default to 1 if invalid
-                const onDutyPortionOfDailyBreak = parseFloat(onDutyPortionOfDailyBreakInput.value) || 0.5; // Default to 0.5 if invalid
-
+                const plannedDailyBreakTotal = parseFloat(plannedDailyBreakTotalInput.value) || 1;
+                const onDutyPortionOfDailyBreak = parseFloat(onDutyPortionOfDailyBreakInput.value) || 0.5;
 
                 // Input validation for global fields
                 if (isNaN(avgSpeed) || avgSpeed <= 0) {
@@ -1768,10 +2014,29 @@
                     errorMessageDiv.textContent = 'Please select a valid daily driving limit or ensure logs provide a valid value.';
                     return;
                 }
-                if (!currentTZSelect.value) {
-                    errorMessageDiv.textContent = 'Please select your current time zone (Trip Start).';
-                    return;
+
+                // Determine current time zone (trip start)
+                let tripStartTimeZone;
+                if (showManualCurrentLatLonCheckbox.checked && currentLatInput.value && currentLonInput.value) {
+                    const lat = parseFloat(currentLatInput.value);
+                    const lon = parseFloat(currentLonInput.value);
+                    tripStartTimeZone = await getTimeZoneFromCoordinates(lat, lon, currentInferredTZDisplay, 'Current Location');
+                    if (!tripStartTimeZone) {
+                        errorMessageDiv.textContent = 'Could not infer time zone for Current Location. Please check coordinates or select manually.';
+                        resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                        advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                        return;
+                    }
+                } else {
+                    tripStartTimeZone = currentTZSelect.value;
+                    if (!tripStartTimeZone) {
+                        errorMessageDiv.textContent = 'Please select your current time zone (Trip Start) or enable Lat/Long input.';
+                        resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                        advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                        return;
+                    }
                 }
+
                 // Default NaN to 0 for calculations
                 if (isNaN(current70HrClock) || current70HrClock < 0) {
                     current70HrClock = 0;
@@ -1791,9 +2056,7 @@
 
                 let totalTripHours = 0;
                 let cumulativeOnDutyTimeFor70Clock = current70HrClock;
-                let currentLegOriginTZ = currentTZSelect.value; // Origin for the first leg
 
-                // Use new granular break values
                 const dailyBreakTotal = plannedDailyBreakTotal;
                 const dailyBreakOnDutyPortion = onDutyPortionOfDailyBreak;
                 const dailyBreakOffDutyPortion = dailyBreakTotal - dailyBreakOnDutyPortion;
@@ -1803,39 +2066,75 @@
 
                 // --- Process Leg 1 (from main section) ---
                 const leg1Miles = parseFloat(milesInput.value);
-                const leg1DestinationTZ = destinationTZInput.value;
+                let leg1DestinationTZ;
+
+                if (showDestLatLon1Checkbox.checked && destinationLatInput.value && destinationLonInput.value) {
+                    const lat = parseFloat(destinationLatInput.value);
+                    const lon = parseFloat(destinationLonInput.value);
+                    leg1DestinationTZ = await getTimeZoneFromCoordinates(lat, lon, leg1DestinationTZDisplay, 'Leg 1 Destination');
+                    if (!leg1DestinationTZ) { // If inference failed
+                        errorMessageDiv.textContent = 'Could not infer time zone for Leg 1 Destination. Please check coordinates or select manually.';
+                        resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                        advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                        return;
+                    }
+                } else {
+                    leg1DestinationTZ = destinationTZSelect.value;
+                    if (!leg1DestinationTZ) {
+                        errorMessageDiv.textContent = 'Please select a destination time zone for Leg 1 or enable Lat/Long input.';
+                        resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                        advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                        return;
+                    }
+                }
 
                 if (isNaN(leg1Miles) || leg1Miles <= 0) {
                     errorMessageDiv.textContent = 'Please enter valid positive miles for Leg 1.';
                     return;
                 }
-                if (!leg1DestinationTZ) {
-                    errorMessageDiv.textContent = 'Please select a destination time zone for Leg 1.';
-                    return;
-                }
+
                 allLegsData.push({ miles: leg1Miles, destTZ: leg1DestinationTZ });
                 totalForwardMiles += leg1Miles;
 
                 // --- Process dynamically added legs ---
                 const dynamicLegSections = legsContainer.querySelectorAll('.leg-section');
-                dynamicLegSections.forEach((legElement, index) => {
-                    const legNumber = index + 2; // Start from Leg 2
+                for (const legElement of dynamicLegSections) { // Use for...of for await inside loop
+                    const legNumber = parseInt(legElement.id.replace('leg-', ''));
                     const miles = parseFloat(legElement.querySelector(`#miles-${legNumber}`).value);
-                    const destTZ = legElement.querySelector(`#destinationTZ-${legNumber}`).value;
+                    const showLatLonCheckbox = legElement.querySelector(`#showDestLatLon-${legNumber}`);
+                    const destLatInput = legElement.querySelector(`#destinationLat-${legNumber}`);
+                    const destLonInput = legElement.querySelector(`#destinationLon-${legNumber}`);
+                    const destTZSelect = legElement.querySelector(`#destinationTZ-${legNumber}`);
+                    const destTZDisplay = legElement.querySelector(`#leg${legNumber}DestinationTZDisplay`);
+
+                    let destTZ;
+                    if (showLatLonCheckbox.checked && destLatInput.value && destLonInput.value) {
+                        const lat = parseFloat(destLatInput.value);
+                        const lon = parseFloat(destLonInput.value);
+                        destTZ = await getTimeZoneFromCoordinates(lat, lon, destTZDisplay, `Leg ${legNumber} Destination`);
+                        if (!destTZ) {
+                            errorMessageDiv.textContent = `Could not infer time zone for Leg ${legNumber} Destination. Please check coordinates or select manually.`;
+                            resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                            advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                            return;
+                        }
+                    } else {
+                        destTZ = destTZSelect.value;
+                        if (!destTZ) {
+                            errorMessageDiv.textContent = `Please select a destination time zone for Leg ${legNumber} or enable Lat/Long input.`;
+                            resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                            advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                            return;
+                        }
+                    }
 
                     if (isNaN(miles) || miles <= 0) {
                         errorMessageDiv.textContent = `Please enter valid positive miles for Leg ${legNumber}.`;
-                        allLegsData.length = 0; // Invalidate all legs
-                        return;
-                    }
-                    if (!destTZ) {
-                        errorMessageDiv.textContent = `Please select a destination time zone for Leg ${legNumber}.`;
-                        allLegsData.length = 0; // Invalidate all legs
                         return;
                     }
                     allLegsData.push({ miles: miles, destTZ: destTZ });
                     totalForwardMiles += miles;
-                });
+                }
 
                 if (allLegsData.length === 0) { // If any validation failed, allLegsData might be empty
                     resultDiv.textContent = 'Your estimated arrival time will appear here.';
@@ -1845,10 +2144,10 @@
 
                 const legSummaries = [];
                 let currentTotalTripHours = 0; // This accumulates across legs for the final ETA
-                let currentCumulativeOnDutyTimeFor70Clock = cumulativeOnDutyTimeFor70Clock; // This accumulates for 70-hr clock
+                let currentCumulativeOnDutyTimeFor70Clock = cumulativeOnDutyTimeFor70Clock;
 
-                allLegsData.forEach((legData, index) => {
-                    const legNumber = index + 1;
+                for (const legData of allLegsData) { // Use for...of for simpler iteration
+                    const legNumber = allLegsData.indexOf(legData) + 1; // Get current leg number
                     const legMiles = legData.miles;
                     const legDestinationTZ = legData.destTZ;
 
@@ -1911,12 +2210,20 @@
                     legSummaries.push(`Leg ${legNumber} (to ${legDestinationTZ}): Arrives ${formattedLegArrival}`);
 
                     // The currentLegOriginTZ is implicitly handled by using the previous leg's destTZ for the next leg's calculation
-                });
+                }
 
                 // --- Add Round Trip Leg if enabled ---
                 if (enableRoundTripCheckbox.checked) {
                     const returnMiles = totalForwardMiles; // Total miles for the return trip
-                    const returnDestinationTZ = currentTZSelect.value; // Back to original start TZ
+                    // For the return trip, the destination is the original starting time zone
+                    const returnDestinationTZ = tripStartTimeZone; // Use the determined trip start TZ
+
+                    if (!returnDestinationTZ) { // Should not happen if tripStartTimeZone was determined
+                         errorMessageDiv.textContent = 'Could not determine return trip destination time zone.';
+                         resultDiv.textContent = 'Your estimated arrival time will appear here.';
+                         advancedResultDiv.textContent = 'Advanced ETA will appear here.';
+                        return;
+                    }
 
                     const returnDrivingHours = returnMiles / avgSpeed;
                     const numDrivingDaysForReturnLeg = returnDrivingHours > 0 ? Math.ceil(returnDrivingHours / dailyDriveLimit) : 0;
@@ -1946,7 +2253,7 @@
                     if (consider70HourClockCheckbox.checked) {
                         const num70HourBlocks = Math.floor(currentCumulativeOnDutyTimeFor70Clock / 70);
                         if (num70HourBlocks > 0) {
-                            legHoursAddedToTotalTrip += num70HourBlocks * 34;
+                            currentTotalTripHours += num70HourBlocks * 34; // Add 34-hour reset time to this leg's total
                             currentCumulativeOnDutyTimeFor70Clock -= (num70HourBlocks * 70);
                         }
                     }
@@ -1979,7 +2286,7 @@
                 const finalFormatter = new Intl.DateTimeFormat('en-US', {
                     year: 'numeric', month: 'long', day: 'numeric',
                     hour: 'numeric', minute: 'numeric', timeZoneName: 'short',
-                    timeZone: enableRoundTripCheckbox.checked ? currentTZSelect.value : allLegsData[allLegsData.length - 1].destTZ, // Final destination TZ of the last leg or original start TZ if round trip
+                    timeZone: enableRoundTripCheckbox.checked ? tripStartTimeZone : allLegsData[allLegsData.length - 1].destTZ, // Final destination TZ of the last leg or original start TZ if round trip
                     hour12: true
                 });
                 const formattedFinalArrival = finalFormatter.format(finalArrivalDate);
@@ -1995,7 +2302,26 @@
                 speedInput.value = '';
                 dailyDrivingLimitSelect.value = '11'; // Reset to default 11 hours
                 populateTimeZones(currentTZSelect); // Re-populate current time zone
-                populateTimeZones(destinationTZInput); // Re-populate Leg 1 destination TZ
+                populateTimeZones(destinationTZSelect); // Re-populate destination time zone
+                destinationTZSelect.value = ''; // Reset to default "Select time zone..."
+
+                // Reset manual current Lat/Lon inputs and hide div
+                showManualCurrentLatLonCheckbox.checked = false;
+                manualCurrentLatLonOptionsDiv.classList.add('hidden');
+                manualCurrentLatLonOptionsDiv.classList.remove('block');
+                currentLatInput.value = '';
+                currentLonInput.value = '';
+                currentInferredTZDisplay.textContent = '';
+
+                // Reset destination Lat/Lon inputs and hide div
+                showDestLatLon1Checkbox.checked = false;
+                leg1DestLatLonOptionsDiv.classList.add('hidden');
+                leg1DestLatLonOptionsDiv.classList.remove('block');
+                destinationLatInput.value = ''; // Reset Lat for Leg 1
+                destinationLonInput.value = ''; // Reset Lon for Leg 1
+                leg1DestinationTZDisplay.textContent = ''; // Clear display
+
+
                 plannedDailyBreakTotalInput.value = '1'; // Reset new inputs
                 onDutyPortionOfDailyBreakInput.value = '0.5'; // Reset new inputs
                 current70HourClockInput.value = ''; // Clear to show placeholder
@@ -2014,10 +2340,11 @@
                     option.disabled = false;
                 });
 
+
                 resultDiv.textContent = 'Your estimated arrival time will appear here.';
                 advancedResultDiv.textContent = 'Advanced ETA will appear here.';
                 errorMessageDiv.textContent = '';
-                currentLocationDisplay.textContent = ''; // Clear location display
+                currentLocationDisplay.textContent = ''; // Clear GPS location display
 
                 // Clear all dynamically added legs
                 legsContainer.innerHTML = '';
@@ -2040,6 +2367,10 @@
                 toggleChainingBtn.textContent = 'Show Destination Chaining Options';
                 logSheetSection.classList.add('hidden');
                 toggleLogSheetBtn.textContent = 'Show Log Sheet Tracker';
+                commentsSectionContent.classList.add('hidden'); // Hide comments section
+                showCommentsBtn.textContent = 'The Comments Section'; // Reset button text
+                announcementsSectionContent.classList.add('hidden'); // Hide announcements section
+                toggleAnnouncementsBtn.textContent = 'Show Announcements'; // Reset button text
 
                 saveCalculatorState(); // Save the reset state
                 calculateETA(); // Recalculate after reset
@@ -2051,7 +2382,7 @@
             speedInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
             dailyDrivingLimitSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // Still listen for manual changes if not linked
             currentTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
-            destinationTZInput.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // For Leg 1
+            destinationTZSelect.addEventListener('change', () => { calculateETA(); saveCalculatorState(); }); // Listen for new destination TZ select
 
             // Event Listeners for new granular break inputs
             plannedDailyBreakTotalInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
@@ -2121,16 +2452,19 @@
             bufferPercentageInput.addEventListener('input', () => { calculateETA(); saveCalculatorState(); });
             enableRoundTripCheckbox.addEventListener('change', () => { calculateETA(); saveCalculatorState(); });
 
-            // --- Comment Modal Functions ---
-            function showCommentModal() {
-                console.log("Show Comments button clicked. Opening modal."); // Debugging log
-                commentModal.classList.remove('hidden');
-            }
-
-            function hideCommentModal() {
-                commentModal.classList.add('hidden');
-                commentInput.value = ''; // Clear input when closing
-            }
+            // --- Comment Section Toggle (now inline) ---
+            showCommentsBtn.addEventListener('click', () => {
+                commentsSectionContent.classList.toggle('hidden');
+                commentsSectionContent.classList.toggle('block');
+                if (commentsSectionContent.classList.contains('block')) {
+                    showCommentsBtn.textContent = 'Hide Comments Section';
+                    // When comments section is revealed, ensure comments are loaded/refreshed
+                    listenForComments();
+                } else {
+                    showCommentsBtn.textContent = 'The Comments Section';
+                }
+                saveCalculatorState(); // Save state of toggle
+            });
 
             // Firestore collection reference for comments
             const commentsCollectionRef = collection(db, `artifacts/${appId}/public/comments`);
@@ -2329,16 +2663,6 @@
                 }
             });
 
-            // Event listeners for comment modal
-            showCommentsBtn.addEventListener('click', showCommentModal);
-            closeCommentModalBtn.addEventListener('click', hideCommentModal);
-            // Close modal if user clicks outside of it
-            commentModal.addEventListener('click', (event) => {
-                if (event.target === commentModal) {
-                    hideCommentModal();
-                }
-            });
-
             // Event delegation for delete and hide buttons within commentsDisplayArea
             commentsDisplayArea.addEventListener('click', (event) => {
                 if (event.target.classList.contains('delete-comment-btn')) {
@@ -2347,6 +2671,121 @@
                 } else if (event.target.classList.contains('hide-comment-btn')) {
                     const commentId = event.target.dataset.commentId;
                     hideComment(commentId);
+                }
+            });
+
+            // --- Announcement Section Logic (New) ---
+            const announcementsCollectionRef = collection(db, `artifacts/${appId}/public/announcements`);
+
+            // Function to save an announcement (Admin only)
+            saveAnnouncementBtn.addEventListener('click', async () => {
+                const announcementText = announcementInput.value.trim();
+                const currentUserId = getFirebaseUserId();
+                const adminUid = getAdminUID();
+
+                if (!announcementText) {
+                    errorMessageDiv.textContent = "Announcement cannot be empty.";
+                    return;
+                }
+                if (!currentUserId || currentUserId !== adminUid || adminUid === 'YOUR_ADMIN_FIREBASE_UID_HERE') {
+                    errorMessageDiv.textContent = "You do not have permission to post announcements.";
+                    console.warn("Attempted announcement post by non-admin or placeholder admin UID.");
+                    return;
+                }
+
+                try {
+                    await addDoc(announcementsCollectionRef, {
+                        userId: currentUserId, // Store admin's UID
+                        announcementText: announcementText,
+                        timestamp: serverTimestamp()
+                    });
+                    announcementInput.value = ''; // Clear input
+                    errorMessageDiv.textContent = '';
+                    console.log("Announcement posted successfully.");
+                } catch (e) {
+                    console.error("Error posting announcement:", e);
+                    errorMessageDiv.textContent = "Error posting announcement. Please try again.";
+                }
+            });
+
+            // Function to listen for real-time announcements
+            async function listenForAnnouncements() {
+                if (!db || !getIsAuthReady()) {
+                    console.warn("Firestore not ready for announcements. Retrying...");
+                    return;
+                }
+
+                // Show/hide admin input based on user's UID
+                if (getFirebaseUserId() === getAdminUID() && getAdminUID() !== 'YOUR_ADMIN_FIREBASE_UID_HERE') {
+                    adminAnnouncementInputDiv.classList.remove('hidden');
+                } else {
+                    adminAnnouncementInputDiv.classList.add('hidden');
+                }
+
+                const q = query(announcementsCollectionRef, orderBy("timestamp", "desc"));
+
+                onSnapshot(q, (snapshot) => {
+                    announcementsDisplayArea.innerHTML = ''; // Clear previous announcements
+                    if (snapshot.empty) {
+                        announcementsDisplayArea.innerHTML = '<p class="text-center text-gray-500">No announcements yet.</p>';
+                        return;
+                    }
+                    snapshot.forEach((doc) => {
+                        const announcementData = doc.data();
+                        const announcementId = doc.id;
+
+                        const announcementEntry = document.createElement('div');
+                        announcementEntry.classList.add('announcement-entry');
+
+                        const timestamp = announcementData.timestamp ? new Date(announcementData.timestamp.toDate()).toLocaleString() : 'N/A';
+                        const userIdDisplay = announcementData.userId || 'Admin'; // Should always be Admin if posted correctly
+
+                        announcementEntry.innerHTML = `
+                            <strong>Posted by: ${userIdDisplay}</strong>
+                            <span class="timestamp">${timestamp}</span>
+                            <p>${announcementData.announcementText}</p>
+                        `;
+
+                        // Add delete button only if current user is the ADMIN_UID
+                        if (getFirebaseUserId() === getAdminUID() && getAdminUID() !== 'YOUR_ADMIN_FIREBASE_UID_HERE') {
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.classList.add('delete-announcement-btn');
+                            deleteBtn.textContent = 'Delete';
+                            deleteBtn.dataset.announcementId = announcementId;
+                            announcementEntry.appendChild(deleteBtn);
+                        }
+                        announcementsDisplayArea.appendChild(announcementEntry);
+                    });
+                }, (error) => {
+                    console.error("Error listening to announcements:", error);
+                    announcementsDisplayArea.innerHTML = '<p class="text-red-500 text-center">Error loading announcements.</p>';
+                });
+            }
+
+            // Event delegation for delete buttons within announcementsDisplayArea
+            announcementsDisplayArea.addEventListener('click', (event) => {
+                if (event.target.classList.contains('delete-announcement-btn')) {
+                    const announcementId = event.target.dataset.announcementId;
+                    // Using a custom modal for confirmation instead of window.confirm
+                    showCustomConfirm("Are you sure you want to delete this announcement? This action cannot be undone.", async () => {
+                        const currentUserId = getFirebaseUserId();
+                        const adminUid = getAdminUID();
+
+                        if (!currentUserId || currentUserId !== adminUid || adminUid === 'YOUR_ADMIN_FIREBASE_UID_HERE') {
+                            errorMessageDiv.textContent = "You do not have permission to delete announcements.";
+                            console.warn("Attempted announcement delete by non-admin or placeholder admin UID.");
+                            return;
+                        }
+                        try {
+                            const announcementDocRef = doc(db, `artifacts/${appId}/public/announcements`, announcementId);
+                            await deleteDoc(announcementDocRef);
+                            console.log("Announcement deleted successfully:", announcementId);
+                            errorMessageDiv.textContent = '';
+                        } catch (e) {
+                            console.error("Error deleting announcement:", e);
+                            errorMessageDiv.textContent = "Error deleting announcement. Please try again.";
+                        }
+                    });
                 }
             });
 
@@ -2372,15 +2811,16 @@
 
             // Placeholder URLs for now - YOU NEED TO REPLACE THESE!
             truckLogo.src = "https://placehold.co/150x100/e0f4f8/2c3e50?text=Upload+Logo";
-            qrCodeImage.src = "https://placehold.co/100x100/e0f4f8/2c3e50?text=Upload+QR";
-
+            // QR Code Image URL generated for https://cyraunyielding.github.io/Trucker-ETA-Calculator/
+            qrCodeImage.src = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://cyraunyielding.github.io/Trucker-ETA-Calculator/";
+            <!-- theBacchanalian -->
             // Set GitHub Link (already correct)
             githubLink.href = "https://github.com/cyraunyielding";
             // Set Issues Link (already correct)
             issuesLink.href = "https://github.com/cyraunyielding/Trucker-ETA-Calculator/issues";
 
             // Load state from local storage first
-            loadCalculatorState();
+            await loadCalculatorState(); // Await this to ensure state is loaded before initial ETA calculation
 
             // Initial calculation when page loads (after loading state)
             calculateETA();
